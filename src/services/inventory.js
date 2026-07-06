@@ -90,6 +90,25 @@ export async function addInventoryItem(ownerUid, itemData) {
       ownerUid,
       createdAt: new Date().toISOString()
     };
+
+    // If new item specifies a vendor, check if it exists in vendors collection. If not, create it.
+    if (item.vendor) {
+      const newVendorQ = query(
+        collection(db, 'vendors'),
+        where('ownerUid', '==', ownerUid),
+        where('name', '==', item.vendor)
+      );
+      const newVendorSnap = await getDocs(newVendorQ);
+      if (newVendorSnap.empty) {
+        await addDoc(collection(db, 'vendors'), {
+          name: item.vendor,
+          ownerUid,
+          createdAt: new Date().toISOString()
+        });
+        console.log(`New vendor ${item.vendor} automatically created upon item addition.`);
+      }
+    }
+
     const docRef = await addDoc(collection(db, 'inventory'), item);
 
     // Create system notification
@@ -108,6 +127,67 @@ export async function updateInventoryItem(ownerUid, itemId, itemData) {
     const updateData = { ...itemData };
     if (itemData.name) updateData.itemName = itemData.name;
     if (itemData.itemName) updateData.name = itemData.itemName;
+
+    if (itemData.vendor !== undefined) {
+      // Fetch current inventory to compare old and new vendor names
+      const invSnap = await getDocs(query(collection(db, 'inventory'), where('ownerUid', '==', ownerUid)));
+      const items = [];
+      invSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+      const itemToUpdate = items.find(i => i.id === itemId);
+
+      if (itemToUpdate) {
+        const oldVendor = itemToUpdate.vendor;
+        const newVendor = itemData.vendor;
+
+        if (oldVendor !== newVendor) {
+          // If new vendor is not empty/null, check if it exists in vendors collection. If not, create it.
+          if (newVendor) {
+            const newVendorQ = query(
+              collection(db, 'vendors'),
+              where('ownerUid', '==', ownerUid),
+              where('name', '==', newVendor)
+            );
+            const newVendorSnap = await getDocs(newVendorQ);
+            if (newVendorSnap.empty) {
+              await addDoc(collection(db, 'vendors'), {
+                name: newVendor,
+                ownerUid,
+                createdAt: new Date().toISOString()
+              });
+              console.log(`New vendor ${newVendor} automatically created on update.`);
+            }
+          }
+
+          // If old vendor is not empty/null, check if it becomes unused.
+          if (oldVendor) {
+            const otherItemsReferencingOldVendor = items.filter(i => i.id !== itemId && i.vendor === oldVendor);
+            if (otherItemsReferencingOldVendor.length === 0) {
+              const oldVendorQ = query(
+                collection(db, 'vendors'),
+                where('ownerUid', '==', ownerUid),
+                where('name', '==', oldVendor)
+              );
+              const oldVendorSnap = await getDocs(oldVendorQ);
+              for (const docD of oldVendorSnap.docs) {
+                await deleteDoc(doc(db, 'vendors', docD.id));
+              }
+              console.log(`Unused old vendor ${oldVendor} removed from vendors collection.`);
+            }
+          }
+        }
+      } else {
+        throw new Error("Unauthorized: Inventory item does not belong to this owner.");
+      }
+    } else {
+      const invSnap = await getDocs(query(collection(db, 'inventory'), where('ownerUid', '==', ownerUid)));
+      const items = [];
+      invSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+      const itemToUpdate = items.find(i => i.id === itemId);
+      if (!itemToUpdate) {
+        throw new Error("Unauthorized: Inventory item does not belong to this owner.");
+      }
+    }
+
     await updateDoc(docRef, updateData);
 
     // Create system notification
@@ -121,7 +201,35 @@ export async function updateInventoryItem(ownerUid, itemId, itemData) {
 // Delete item
 export async function deleteInventoryItem(ownerUid, itemId, itemName) {
   try {
-    await deleteDoc(doc(db, 'inventory', itemId));
+    const itemRef = doc(db, 'inventory', itemId);
+    const itemSnap = await getDocs(query(collection(db, 'inventory'), where('ownerUid', '==', ownerUid)));
+    const items = [];
+    itemSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+    const itemToDelete = items.find(i => i.id === itemId);
+    if (!itemToDelete) {
+      throw new Error("Unauthorized: Inventory item does not belong to this owner.");
+    }
+
+    await deleteDoc(itemRef);
+
+    if (itemToDelete && itemToDelete.vendor) {
+      const vendorName = itemToDelete.vendor;
+      const remainingItems = items.filter(i => i.id !== itemId);
+      const isVendorReferenced = remainingItems.some(i => i.vendor === vendorName);
+
+      if (!isVendorReferenced) {
+        const vendorQ = query(
+          collection(db, 'vendors'),
+          where('ownerUid', '==', ownerUid),
+          where('name', '==', vendorName)
+        );
+        const vendorSnap = await getDocs(vendorQ);
+        for (const docD of vendorSnap.docs) {
+          await deleteDoc(doc(db, 'vendors', docD.id));
+        }
+        console.log(`Unreferenced vendor ${vendorName} removed from vendors collection.`);
+      }
+    }
 
     // Create system notification
     await addNotification(ownerUid, 'warning', 'Inventory Deleted', `${itemName || 'An item'} was removed from inventory.`);

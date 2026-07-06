@@ -56,6 +56,26 @@ export async function handleVendorAction(requestId, action, ownerUid) {
     }
 
     const requestData = requestSnapshot.data();
+
+    // Fetch actor profile to enforce multi-tenant isolation
+    const actorDoc = await getDoc(doc(db, 'users', ownerUid));
+    if (!actorDoc.exists()) {
+      throw new Error('User profile not found.');
+    }
+    const actorProfile = actorDoc.data();
+
+    if (actorProfile.role === 'owner') {
+      if (requestData.ownerUid !== ownerUid) {
+        throw new Error('Unauthorized: This procurement request does not belong to your business.');
+      }
+    } else if (actorProfile.role === 'vendor') {
+      if (requestData.vendor !== actorProfile.businessName) {
+        throw new Error('Unauthorized: This procurement request was not placed with your vendor profile.');
+      }
+    } else {
+      throw new Error('Unauthorized role.');
+    }
+
     const newStatus = action === 'accept' ? 'Approved' : 'Rejected';
 
     // Update status in Firestore immediately

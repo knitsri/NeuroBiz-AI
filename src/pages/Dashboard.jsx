@@ -28,6 +28,26 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
+const ProgressBar = ({ label, score, max, colorClass = "bg-indigo-500" }) => {
+  const percentage = Math.max(0, Math.min(100, (score / max) * 100));
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
+        <span className="text-slate-400">{label}</span>
+        <span className="text-slate-200">{score} <span className="text-slate-600">/{max}</span></span>
+      </div>
+      <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-850/40">
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: `${percentage}%` }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className={`h-full ${colorClass} rounded-full`}
+        />
+      </div>
+    </div>
+  );
+};
+
 function RecommendationCard({ item }) {
   const navigate = useNavigate();
   const { title, description, businessImpact, expectedResult, recommendation, observation, suggestedAction, priority, category } = item;
@@ -285,11 +305,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Main Section layout: 2 columns (AI Health Check & Business Health Trend) */}
+      {/* Main Section layout: 2 columns (AI Health Check & Explainable AI Card) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Left Col: AI Health Scan (Takes 2 columns) */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
+        {/* Left Col: AI Health Scan (Takes 2 or 3 columns depending on scan status) */}
+        <div className={`${lastScanResults ? 'lg:col-span-2' : 'lg:col-span-3'} flex flex-col gap-6 transition-all duration-500`}>
           {/* AI Health Scan Card */}
           <div className="glass rounded-3xl p-6 border border-slate-800 relative overflow-hidden h-[730px] flex flex-col">
             {/* Background design elements */}
@@ -601,48 +621,98 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Right Col: Score Trend chart */}
-        <div className="lg:col-span-1 glass rounded-3xl p-6 border border-slate-800 flex flex-col justify-between h-[730px]">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4.5 w-4.5 text-indigo-400" />
-              <h2 className="text-base font-bold text-slate-200">Business Health Trend</h2>
-            </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed font-medium mb-4">
-              Historical view of weekly health metrics calculated by NeuroBiz AI. Shows the effectiveness of your restock frequency.
-            </p>
-          </div>
+        {/* Right Col: Explainable AI Score Breakdown */}
+        <AnimatePresence>
+          {lastScanResults && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="lg:col-span-1 glass rounded-3xl p-6 border border-slate-800 flex flex-col justify-between h-[730px] overflow-y-auto scrollbar-thin"
+            >
+              <div className="space-y-5">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">🧠</span>
+                    <h2 className="text-base font-bold text-slate-200">Explainable AI</h2>
+                  </div>
+                  <p className="text-[10px] text-slate-505 uppercase font-black tracking-wider leading-none">
+                    Business Health Score Breakdown
+                  </p>
+                </div>
 
-          <div className="flex-1 min-h-[360px] my-6 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} axisLine={false} />
-                <YAxis domain={[0, 100]} stroke="#64748b" fontSize={9} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#1e293b',
-                    borderRadius: '8px',
-                    fontSize: '11px',
-                    color: '#f8fafc'
-                  }}
-                />
-                <Area type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorScore)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+                {/* Score display */}
+                <div className="flex items-baseline justify-between border-b border-slate-850/65 pb-3">
+                  <span className="text-[11px] font-bold text-slate-400">Business Health</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-indigo-400">{lastScanResults.score}</span>
+                    <span className="text-xs font-bold text-slate-600">/100</span>
+                  </div>
+                </div>
 
-          <div className="mt-4 p-3 rounded-xl bg-slate-900/40 border border-slate-850 flex items-center justify-between text-[10px] font-bold text-slate-400">
-            <span>Peak Health: <strong className="text-emerald-400">82%</strong></span>
-            <span>Target Health: <strong className="text-indigo-400">90%</strong></span>
-          </div>
-        </div>
+                {/* Progress Indicators */}
+                <div className="space-y-4">
+                  <ProgressBar 
+                    label="Inventory Management" 
+                    score={lastScanResults.breakdown?.inventoryScore ?? 30} 
+                    max={30} 
+                    colorClass="bg-indigo-500" 
+                  />
+                  <ProgressBar 
+                    label="Procurement Health" 
+                    score={lastScanResults.breakdown?.procurementScore ?? 20} 
+                    max={20} 
+                    colorClass="bg-amber-500" 
+                  />
+                  <ProgressBar 
+                    label="Vendor Management" 
+                    score={lastScanResults.breakdown?.vendorScore ?? 20} 
+                    max={20} 
+                    colorClass="bg-emerald-500" 
+                  />
+                  <ProgressBar 
+                    label="Stock Availability" 
+                    score={lastScanResults.breakdown?.stockScore ?? 20} 
+                    max={20} 
+                    colorClass="bg-rose-500" 
+                  />
+                  <ProgressBar 
+                    label="Marketing Activity" 
+                    score={lastScanResults.breakdown?.marketingScore ?? 10} 
+                    max={10} 
+                    colorClass="bg-purple-500" 
+                  />
+                </div>
+
+                {/* AI Explanation Summary */}
+                {lastScanResults.summary && (
+                  <div className="mt-4 border-t border-slate-850 pt-4 space-y-2.5">
+                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Why this score?</h4>
+                    <div className="space-y-1.5 text-[11px] text-slate-450 leading-relaxed font-semibold">
+                      {lastScanResults.summary.split('\n').map((line, idx) => {
+                        const cleanLine = line.replace(/^[•\-\*\s]+/, '').trim();
+                        if (!cleanLine) return null;
+                        return (
+                          <div key={idx} className="flex items-start gap-2">
+                            <span className="text-indigo-400 mt-1 shrink-0 text-xs">•</span>
+                            <span>{cleanLine}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Final Score Badge */}
+              <div className="mt-4 pt-4 border-t border-slate-850/80 flex items-center justify-between text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                <span>Final Score</span>
+                <span className="text-slate-200">{lastScanResults.score} <span className="text-slate-650">/100</span></span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

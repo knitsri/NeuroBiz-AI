@@ -3,23 +3,23 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { getUserProfile, logoutUser } from '../services/auth';
-import { 
-  subscribeToInventory, 
+import {
+  subscribeToInventory,
   seedInventoryIfEmpty,
   addInventoryItem as addInventoryItemService,
   updateInventoryItem as updateInventoryItemService,
-  deleteInventoryItem as deleteInventoryItemService 
+  deleteInventoryItem as deleteInventoryItemService
 } from '../services/inventory';
-import { 
-  subscribeToOwnerProcurements, 
+import {
+  subscribeToOwnerProcurements,
   subscribeToVendorProcurements,
   approveRecommendation as approveRecommendationService,
   handleVendorAction as handleVendorActionService
 } from '../services/procurement';
-import { 
-  subscribeToMarketingCampaigns 
+import {
+  subscribeToMarketingCampaigns
 } from '../services/marketing';
-import { 
+import {
   subscribeToNotifications,
   markNotificationsAsRead as markNotificationsAsReadService,
   addNotification as addNotificationService
@@ -33,17 +33,14 @@ export const AppProvider = ({ children }) => {
 
   const [activeRole, setActiveRole] = useState('owner'); // 'owner' | 'vendor'
   const [businessType, setBusinessType] = useState('pharmacy'); // 'pharmacy' | 'restaurant' | 'clothing'
-  
+
   const [inventory, setInventory] = useState([]);
   const [procurementRequests, setProcurementRequests] = useState([]);
   const [marketingCampaigns, setMarketingCampaigns] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [vendorsList, setVendorsList] = useState([]);
-  
-  const [lastScanResults, setLastScanResults] = useState(() => {
-    const saved = localStorage.getItem('neurobiz_scan_results');
-    return saved ? JSON.parse(saved) : null;
-  });
+
+  const [lastScanResults, setLastScanResults] = useState(null);
 
   // Listen to Firebase Auth state updates
   useEffect(() => {
@@ -55,7 +52,11 @@ export const AppProvider = ({ children }) => {
             setCurrentUser(profile);
             setBusinessType(profile.businessType || 'pharmacy');
             setActiveRole(profile.role || 'owner');
-            
+
+            // User-scoped cache isolation to prevent cross-owner data leakage
+            const saved = localStorage.getItem(`neurobiz_scan_results_${user.uid}`);
+            setLastScanResults(saved ? JSON.parse(saved) : null);
+
             // Seed inventory if empty
             await seedInventoryIfEmpty(user.uid, profile.businessType || 'pharmacy');
           }
@@ -65,7 +66,6 @@ export const AppProvider = ({ children }) => {
       } else {
         setCurrentUser(null);
         setLastScanResults(null);
-        localStorage.removeItem('neurobiz_scan_results');
       }
       setAuthLoading(false);
     });
@@ -160,9 +160,9 @@ export const AppProvider = ({ children }) => {
   const approveRecommendation = async (rec) => {
     if (currentUser) {
       await approveRecommendationService(
-        currentUser.uid, 
-        rec, 
-        currentUser.businessName, 
+        currentUser.uid,
+        rec,
+        currentUser.businessName,
         businessType
       );
       return true;
@@ -221,7 +221,7 @@ export const AppProvider = ({ children }) => {
       const prevSuggestion = lastScanResults ? lastScanResults.marketingSuggestion : "N/A";
 
       const { generateGeminiMarketingCampaign } = await import('../services/gemini');
-      
+
       const responseJson = await generateGeminiMarketingCampaign(
         currentUser.businessName,
         businessType,
@@ -310,10 +310,15 @@ export const AppProvider = ({ children }) => {
 
     try {
       // Fetch Firestore data
+      console.log("========== CURRENT USER ==========");
+      console.log(currentUser);
+      console.log("Current UID:", currentUser.uid);
       const invQuery = query(collection(db, 'inventory'), where('ownerUid', '==', currentUser.uid));
       const invSnap = await getDocs(invQuery);
       const dbInventory = [];
       invSnap.forEach(d => dbInventory.push({ id: d.id, ...d.data() }));
+      console.log("========== INVENTORY FROM FIRESTORE ==========");
+      console.table(dbInventory);
 
       const procQuery = query(collection(db, 'procurements'), where('ownerUid', '==', currentUser.uid));
       const procSnap = await getDocs(procQuery);
@@ -346,18 +351,18 @@ export const AppProvider = ({ children }) => {
         .join('|');
 
       // Check cache validity
-      if (!force && lastScanResults && 
-          lastScanResults.inventoryHash === currentInventoryHash && 
-          lastScanResults.procurementHash === currentProcurementHash) {
+      if (!force && lastScanResults &&
+        lastScanResults.inventoryHash === currentInventoryHash &&
+        lastScanResults.procurementHash === currentProcurementHash) {
         console.log("Cached scan match detected. Re-using cached AI Health scan.");
-        
+
         // Update time of scan execution for presentation
         const cachedResults = {
           ...lastScanResults,
           timestamp: new Date().toLocaleTimeString()
         };
         setLastScanResults(cachedResults);
-        localStorage.setItem('neurobiz_scan_results', JSON.stringify(cachedResults));
+        localStorage.setItem(`neurobiz_scan_results_${currentUser.uid}`, JSON.stringify(cachedResults));
         return cachedResults;
       }
 
@@ -371,12 +376,9 @@ export const AppProvider = ({ children }) => {
         status: i.status || ""
       }));
 
-      const cleanVendors = dbVendors.map(v => ({
-        name: v.name || "",
-        contact: v.contact || "",
-        email: v.email || "",
-        performanceScore: v.performanceScore || ""
-      }));
+      // Derive clean vendors list strictly from active inventory to prevent stale vendors
+      const cleanVendors = Array.from(new Set(cleanInventory.map(i => i.vendor).filter(Boolean)))
+        .map(vName => ({ name: vName }));
 
       const cleanProcurements = dbProcurements.map(p => ({
         item: p.item || "",
@@ -401,14 +403,69 @@ export const AppProvider = ({ children }) => {
         read: n.read || false
       }));
 
+      // ==========================================
+      // DETERMINISTIC XAI HEALTH SCORE CALCULATION
+      // ==========================================
+      // Category 1: Inventory Management (Max 30 points)
+      // Deduct 8 points per Out of Stock item, 4 points per Low Stock item.
+      const outOfStockItems = dbInventory.filter(i => i.status === 'Out of Stock');
+      const lowStockItems = dbInventory.filter(i => i.status === 'Low Stock');
+      let inventoryScore = 30 - (outOfStockItems.length * 8) - (lowStockItems.length * 4);
+      inventoryScore = Math.max(0, Math.min(30, inventoryScore));
+
+      // Category 2: Procurement Health (Max 20 points)
+      // Deduct 4 points per Pending request, 5 points per Rejected request.
+      const pendingProcurements = dbProcurements.filter(p => p.status === 'Pending');
+      const rejectedProcurements = dbProcurements.filter(p => p.status === 'Rejected');
+      let procurementScore = 20 - (pendingProcurements.length * 4) - (rejectedProcurements.length * 5);
+      procurementScore = Math.max(0, Math.min(20, procurementScore));
+
+      // Category 3: Vendor Management (Max 20 points)
+      // Deduct 5 points if any inventory item is missing a vendor name.
+      // Deduct 3 points for each Firestore vendor profile with missing email or contact.
+      const itemsWithNoVendor = dbInventory.filter(i => !i.vendor);
+      const vendorsWithMissingInfo = dbVendors.filter(v => !v.email || !v.contact);
+      let vendorScore = 20 - (itemsWithNoVendor.length * 5) - (vendorsWithMissingInfo.length * 3);
+      vendorScore = Math.max(0, Math.min(20, vendorScore));
+
+      // Category 4: Stock Availability (Max 20 points)
+      // Healthy items / total items ratio. If no items, give 20.
+      const healthyItems = dbInventory.filter(i => i.status === 'In Stock');
+      const stockScore = dbInventory.length > 0 
+        ? Math.round((healthyItems.length / dbInventory.length) * 20)
+        : 20;
+
+      // Category 5: Marketing Activity (Max 10 points)
+      // Award 5 points if marketing campaigns exist, 5 more if more than 1 exists.
+      let marketingScore = 0;
+      if (dbMarketing.length > 0) marketingScore += 5;
+      if (dbMarketing.length > 1) marketingScore += 5;
+
+      const totalScore = inventoryScore + procurementScore + vendorScore + stockScore + marketingScore;
+
       const businessContext = {
         businessType,
         inventory: cleanInventory,
         vendors: cleanVendors,
         procurements: cleanProcurements,
         marketingCampaigns: cleanMarketing,
-        notifications: cleanNotifications
+        notifications: cleanNotifications,
+        calculatedScoreBreakdown: {
+          totalScore,
+          inventoryScore,
+          procurementScore,
+          vendorScore,
+          stockScore,
+          marketingScore
+        }
       };
+
+      console.log("========== BUSINESS CONTEXT SENT TO GEMINI ==========");
+      console.log(businessContext);
+      console.table(cleanInventory);
+      console.table(cleanVendors);
+      console.table(cleanProcurements);
+      console.table(cleanMarketing);
 
       // Call Gemini 2.5 Flash Health Scanner
       const { runGeminiHealthScan } = await import('../services/gemini');
@@ -416,7 +473,14 @@ export const AppProvider = ({ children }) => {
 
       // Map Gemini structured JSON properties directly to the UI
       const results = {
-        score: Number(geminiResult.businessHealth || 80),
+        score: totalScore,
+        breakdown: {
+          inventoryScore,
+          procurementScore,
+          vendorScore,
+          stockScore,
+          marketingScore
+        },
         lowStockCount: dbInventory.filter(i => i.status === 'Low Stock' || i.status === 'Out of Stock').length,
         deadStockItem: geminiResult.deadStock || geminiResult.deadStockItem || 'N/A',
         pendingRequests: dbProcurements.filter(r => r.status === 'Pending').length,
@@ -432,7 +496,7 @@ export const AppProvider = ({ children }) => {
       };
 
       setLastScanResults(results);
-      localStorage.setItem('neurobiz_scan_results', JSON.stringify(results));
+      localStorage.setItem(`neurobiz_scan_results_${currentUser.uid}`, JSON.stringify(results));
 
       await addNotificationService(
         currentUser.uid,
@@ -470,7 +534,7 @@ export const AppProvider = ({ children }) => {
       marketingCampaigns,
       notifications,
       lastScanResults,
-      
+
       // Counter stats
       totalItemsCount,
       pendingRequestsCount,
