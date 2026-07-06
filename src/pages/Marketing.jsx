@@ -1,6 +1,45 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { addMarketingCampaign } from '../services/marketing';
+import { storage } from '../services/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+// Helper function to convert base64 data URL to a Blob
+const dataURLtoBlob = (dataUrl) => {
+  const arr = dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[arr.length - 1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+};
+
+const getLocalFallbackCampaign = (product, offer, discount) => {
+  const title = `${discount}% OFF on ${product}!`;
+  const posterHeadline = `${discount}% OFF`;
+  const posterSubtitle = `SPECIAL ON ${product.toUpperCase()}`;
+  const callToAction = 'ORDER NOW';
+  const instagramCaption = `✨ Special Promo Alert! ✨\n\nGet an amazing ${discount}% OFF on our ${product}! Promotion details: ${offer}.\n\nDon't miss out on this exclusive deal. ${callToAction}! 🛍️\n\n#sale #discount #promotion #${product.toLowerCase().replace(/\s+/g, '')}`;
+  const whatsappPromotion = `🔥 *SPECIAL PROMOTION* 🔥\n\nEnjoy *${discount}% OFF* on *${product}*!\n👉 Promo Type: ${offer}\n\nLimit: While stock lasts.\n\n*${callToAction}*!`;
+  const description = `Discount campaign for ${product}`;
+
+  return {
+    id: 'camp-fallback-' + Date.now(),
+    product,
+    promoType: offer,
+    discount,
+    title,
+    posterHeadline,
+    posterSubtitle,
+    callToAction,
+    instagramCaption,
+    whatsappPromotion,
+    description
+  };
+};
 import { 
   Megaphone, 
   Sparkles, 
@@ -12,7 +51,8 @@ import {
   RefreshCw,
   Download,
   Image as ImageIcon,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
 export default function Marketing() {
@@ -32,6 +72,7 @@ export default function Marketing() {
   const [copiedType, setCopiedType] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+  const [toastType, setToastType] = useState('success');
 
   // Canvas drawing generator to build base64 Data URLs in real-time matching selections
   const drawCanvasToDataUrl = (product, promoCat, discPct, headline = '', subtitle = '', cta = '') => {
@@ -164,91 +205,213 @@ export default function Marketing() {
 
   const handleGenerate = async (e) => {
     e.preventDefault();
-    if (!selectedProduct) return;
+    if (!selectedProduct || isGenerating) return;
 
     setIsGenerating(true);
+    setToastType('success');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
     
     try {
       // 1. Call async campaign generator in AppContext
-      const aiCampaign = await generateAiCampaign(selectedProduct, promoType, discount);
-      
-      // 2. Generate dynamic Canvas base64 images using Gemini's copy headlines!
-      const posterData = drawCanvasToDataUrl(
-        selectedProduct, 
-        promoType, 
-        discount,
-        aiCampaign.posterHeadline,
-        aiCampaign.posterSubtitle,
-        aiCampaign.callToAction
-      );
-
-      // 3. Set to state (guarantees preview & download match exactly!)
-      setCurrentAsset({
-        ...aiCampaign,
-        posterUrl: posterData
-      });
-
-      // 4. Save campaign to Firestore
-      if (currentUser) {
-        await addMarketingCampaign(currentUser.uid, {
-          product: selectedProduct,
-          posterUrl: posterData,
-          instagram: aiCampaign.instagramCaption,
-          whatsapp: aiCampaign.whatsappPromotion
-        });
+      let aiCampaign;
+      let showFallbackWarning = false;
+      try {
+        aiCampaign = await generateAiCampaign(selectedProduct, promoType, discount);
+      } catch (geminiError) {
+        console.error("Gemini text generation error:", geminiError);
+        const errorMsg = geminiError.message || String(geminiError);
+        if (errorMsg.includes('429') || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate limit') || errorMsg.toLowerCase().includes('exhausted')) {
+          aiCampaign = getLocalFallbackCampaign(selectedProduct, promoType, discount);
+          showFallbackWarning = true;
+        } else {
+          throw geminiError;
+        }
       }
       
-      setToastMsg('AI Marketing Kit compiled successfully!');
+      // 2. Call backend image generator endpoint
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: currentUser?.uid || '',
+          product: selectedProduct,
+          promoType: promoType,
+          discount: discount,
+          businessType: businessType,
+          instagram: aiCampaign.instagramCaption,
+          whatsapp: aiCampaign.whatsappPromotion
+        }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        let errorMsg = 'Failed to generate poster image';
+        try {
+          const errorData = await response.json();
+          if (errorData.error === 'IMAGE_MODEL_BUSY') {
+            errorMsg = errorData.message || 'The image generation model is temporarily busy. Please try again in a few minutes.';
+          } else {
+            errorMsg = errorData.message || errorData.error || errorMsg;
+          }
+        } catch (e) {
+          if (response.status === 429) {
+            errorMsg = 'Image generation quota exceeded. Please try again later.';
+          } else if (response.status === 401 || response.status === 403) {
+            errorMsg = 'Authentication failed. Invalid API key configuration.';
+          } else if (response.status === 404) {
+            errorMsg = 'Requested image generation model could not be found.';
+          } else if (response.status === 503) {
+            errorMsg = 'The image generation model is temporarily busy. Please try again in a few minutes.';
+          } else if (response.status >= 500) {
+            errorMsg = 'Internal server error from image provider. Please try again.';
+          }
+        }
+        throw new Error(errorMsg);
+      }
+
+      const data = await response.json();
+
+      // 3. Set to state (uses the Storage URL returned as imageUrl and maps captions to render keys)
+      setCurrentAsset({
+        ...aiCampaign,
+        instagram: aiCampaign.instagramCaption || aiCampaign.instagram || '',
+        whatsapp: aiCampaign.whatsappPromotion || aiCampaign.whatsapp || '',
+        posterUrl: data.imageUrl
+      });
+      
+      if (showFallbackWarning) {
+        setToastType('error');
+        setToastMsg('AI text quota reached. Fallback marketing copy generated.');
+      } else {
+        setToastType('success');
+        setToastMsg('AI Marketing Kit compiled successfully!');
+      }
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     } catch (err) {
       console.error(err);
-      alert("AI Campaign generation failed: " + (err.message || err));
+      let errorMsg = err.message || err;
+      if (err.name === 'AbortError') {
+        errorMsg = 'Request timed out after 60 seconds.';
+      } else if (err.message && err.message.includes('Failed to fetch')) {
+        errorMsg = 'Network failure. Cannot connect to image generation server.';
+      }
+      setToastType('error');
+      setToastMsg(errorMsg);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 5000);
     } finally {
+      clearTimeout(timeoutId);
       setIsGenerating(false);
     }
   };
 
   const handleRegenerateItem = async () => {
-    if (!currentAsset) return;
+    if (!currentAsset || isRegeneratingPoster) return;
     
     setIsRegeneratingPoster(true);
+    setToastType('success');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
       const offsetDiscount = Math.min(Number(discount) + (Math.random() > 0.5 ? 5 : -5), 75);
       
-      const aiCampaign = await generateAiCampaign(selectedProduct, promoType, offsetDiscount);
+      let aiCampaign;
+      let showFallbackWarning = false;
+      try {
+        aiCampaign = await generateAiCampaign(selectedProduct, promoType, offsetDiscount);
+      } catch (geminiError) {
+        console.error("Gemini text regeneration error:", geminiError);
+        const errorMsg = geminiError.message || String(geminiError);
+        if (errorMsg.includes('429') || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate limit') || errorMsg.toLowerCase().includes('exhausted')) {
+          aiCampaign = getLocalFallbackCampaign(selectedProduct, promoType, offsetDiscount);
+          showFallbackWarning = true;
+        } else {
+          throw geminiError;
+        }
+      }
       
-      const newImgData = drawCanvasToDataUrl(
-        selectedProduct, 
-        promoType, 
-        offsetDiscount,
-        aiCampaign.posterHeadline,
-        aiCampaign.posterSubtitle,
-        aiCampaign.callToAction
-      );
+      // Call backend image generator endpoint
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: currentUser?.uid || '',
+          product: selectedProduct,
+          promoType: promoType,
+          discount: offsetDiscount,
+          businessType: businessType,
+          instagram: aiCampaign.instagramCaption,
+          whatsapp: aiCampaign.whatsappPromotion
+        }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        let errorMsg = 'Failed to regenerate poster image';
+        try {
+          const errorData = await response.json();
+          if (errorData.error === 'IMAGE_MODEL_BUSY') {
+            errorMsg = errorData.message || 'The image generation model is temporarily busy. Please try again in a few minutes.';
+          } else {
+            errorMsg = errorData.message || errorData.error || errorMsg;
+          }
+        } catch (e) {
+          if (response.status === 429) {
+            errorMsg = 'Image generation quota exceeded. Please try again later.';
+          } else if (response.status === 401 || response.status === 403) {
+            errorMsg = 'Authentication failed. Invalid API key configuration.';
+          } else if (response.status === 404) {
+            errorMsg = 'Requested image generation model could not be found.';
+          } else if (response.status === 503) {
+            errorMsg = 'The image generation model is temporarily busy. Please try again in a few minutes.';
+          } else if (response.status >= 500) {
+            errorMsg = 'Internal server error from image provider. Please try again.';
+          }
+        }
+        throw new Error(errorMsg);
+      }
+
+      const data = await response.json();
       
       setCurrentAsset({
         ...aiCampaign,
-        posterUrl: newImgData
+        instagram: aiCampaign.instagramCaption || aiCampaign.instagram || '',
+        whatsapp: aiCampaign.whatsappPromotion || aiCampaign.whatsapp || '',
+        posterUrl: data.imageUrl
       });
-
-      if (currentUser) {
-        await addMarketingCampaign(currentUser.uid, {
-          product: selectedProduct,
-          posterUrl: newImgData,
-          instagram: aiCampaign.instagramCaption,
-          whatsapp: aiCampaign.whatsappPromotion
-        });
-      }
       
-      setToastMsg('AI Marketing Kit regenerated!');
+      if (showFallbackWarning) {
+        setToastType('error');
+        setToastMsg('AI text quota reached. Fallback marketing copy generated.');
+      } else {
+        setToastType('success');
+        setToastMsg('AI Marketing Kit regenerated!');
+      }
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     } catch (err) {
       console.error(err);
-      alert("AI Campaign regeneration failed: " + (err.message || err));
+      let errorMsg = err.message || err;
+      if (err.name === 'AbortError') {
+        errorMsg = 'Request timed out after 60 seconds.';
+      } else if (err.message && err.message.includes('Failed to fetch')) {
+        errorMsg = 'Network failure. Cannot connect to image generation server.';
+      }
+      setToastType('error');
+      setToastMsg(errorMsg);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 5000);
     } finally {
+      clearTimeout(timeoutId);
       setIsRegeneratingPoster(false);
     }
   };
@@ -265,15 +428,129 @@ export default function Marketing() {
     }, 2000);
   };
 
-  const triggerDownload = (dataUrl, fileName) => {
-    const link = document.createElement('a');
-    link.download = fileName;
-    link.href = dataUrl;
-    link.click();
-
-    setToastMsg('Image downloaded successfully to local disk!');
+  const triggerDownload = (backgroundImageUrl, fileName) => {
+    // Show a toast that compilation/download is starting
+    setToastType('success');
+    setToastMsg('Compiling poster layers...');
     setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 1000;
+    const ctx = canvas.getContext('2d');
+
+    const img = new Image();
+    // Allow cross-origin requests
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      // 1. Draw the generated background image
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // 2. Determine Theme colors
+      let primaryColor = '#6366f1';
+      let secondaryColor = '#818cf8';
+      if (businessType === 'restaurant') {
+        primaryColor = '#10b981';
+        secondaryColor = '#34d399';
+      } else if (businessType === 'clothing') {
+        primaryColor = '#ec4899';
+        secondaryColor = '#f472b6';
+      }
+
+      // 3. Draw gradient overlay for text readability
+      const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      grad.addColorStop(0, 'rgba(10, 13, 26, 0.4)');
+      grad.addColorStop(0.75, 'rgba(10, 13, 26, 0.65)');
+      grad.addColorStop(1, 'rgba(2, 6, 23, 0.9)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 4. Draw Glowing framing borders (SaaS theme)
+      ctx.strokeStyle = primaryColor;
+      ctx.lineWidth = 14;
+      ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+      // 5. Draw Branding Header
+      ctx.fillStyle = secondaryColor;
+      ctx.font = '900 30px sans-serif';
+      ctx.fillText('NEUROBIZ AI', 50, 80);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText('SME AUTOPILOT CAMPAIGNS • SECURE DIAGNOSTICS', 50, 105);
+
+      // 6. Main Headline (Campaign Type)
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 36px sans-serif';
+      const headlineText = (currentAsset.title || currentAsset.posterHeadline || promoType).toUpperCase();
+      ctx.fillText(headlineText, 50, 240);
+
+      // 7. Subheader (Product Name)
+      ctx.fillStyle = secondaryColor;
+      ctx.font = '800 20px sans-serif';
+      const productText = (currentAsset.product || selectedProduct).toUpperCase();
+      ctx.fillText(productText, 50, 300);
+
+      // 8. Circular Discount Badge
+      ctx.beginPath();
+      ctx.arc(canvas.width - 150, 240, 80, 0, 2 * Math.PI);
+      ctx.fillStyle = primaryColor;
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 32px sans-serif';
+      ctx.textAlign = 'center';
+      const discountText = `${currentAsset.discount || discount}%`;
+      ctx.fillText(discountText, canvas.width - 150, 235);
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText('OFF', canvas.width - 150, 260);
+      ctx.textAlign = 'left';
+
+      // 9. CTA / Slogan Info Card
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.fillRect(50, 800, canvas.width - 100, 140);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(50, 800, canvas.width - 100, 140);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 24px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('SHOP NOW', canvas.width / 2, 860);
+      
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.fillText('Scan QR Code or visit neurobiz.ai to redeem', canvas.width / 2, 890);
+      ctx.textAlign = 'left';
+
+      // 10. Trigger actual download
+      const compiledDataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = fileName;
+      link.href = compiledDataUrl;
+      link.click();
+
+      setToastType('success');
+      setToastMsg('Image downloaded successfully with text overlays!');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    };
+    img.onerror = (e) => {
+      console.error("Canvas background load failed:", e);
+      // Fallback to downloading raw background image
+      const link = document.createElement('a');
+      link.download = fileName;
+      link.href = backgroundImageUrl;
+      link.click();
+      setToastType('error');
+      setToastMsg('Failed to compile overlays. Downloaded background image.');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    };
+    img.src = backgroundImageUrl;
   };
 
   return (
@@ -281,8 +558,16 @@ export default function Marketing() {
       
       {/* Toast popup */}
       {showToast && (
-        <div className="fixed top-20 right-8 z-50 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-450 text-xs font-bold animate-in slide-in-from-top-4 duration-300 flex items-center gap-2 shadow-xl shadow-emerald-950/20">
-          <CheckCircle2 className="h-4.5 w-4.5 text-emerald-400 font-semibold" />
+        <div className={`fixed top-20 right-8 z-50 p-4 rounded-xl border text-xs font-bold animate-in slide-in-from-top-4 duration-300 flex items-center gap-2 shadow-xl ${
+          toastType === 'error' 
+            ? 'bg-rose-500/10 border-rose-500/30 text-rose-450 shadow-rose-950/20' 
+            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-450 text-xs font-bold shadow-emerald-950/20'
+        }`}>
+          {toastType === 'error' ? (
+            <AlertCircle className="h-4.5 w-4.5 text-rose-400 font-semibold" />
+          ) : (
+            <CheckCircle2 className="h-4.5 w-4.5 text-emerald-400 font-semibold" />
+          )}
           <span>{toastMsg}</span>
         </div>
       )}
@@ -412,12 +697,50 @@ export default function Marketing() {
                 ) : (
                   <div className="flex flex-col items-center gap-4">
                     {/* Real preview matches download exactly */}
-                    <div className="relative rounded-2xl overflow-hidden border border-slate-850/80 bg-slate-950 w-full max-w-[420px] shadow-2xl">
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-850/80 bg-slate-950 w-full max-w-[420px] shadow-2xl aspect-[4/5] flex items-center justify-center">
                       <img 
                         src={currentAsset.posterUrl} 
                         alt="NeuroBiz AI generated Poster preview" 
-                        className="object-contain w-full h-auto max-h-[480px]" 
+                        className="absolute inset-0 w-full h-full object-cover" 
                       />
+                      
+                      {/* Premium UI Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-slate-950/45 p-6 flex flex-col justify-between text-left pointer-events-none select-none">
+                        {/* Top Section */}
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="text-xs font-black tracking-widest text-indigo-400 uppercase">NEUROBIZ AI</div>
+                            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">AUTOPILOT KIT</div>
+                          </div>
+                          
+                          {/* Circle Discount Badge */}
+                          <div className={`h-16 w-16 rounded-full flex flex-col items-center justify-center border-2 border-white/90 text-white font-extrabold shadow-lg ${
+                            businessType === 'restaurant' ? 'bg-emerald-500 shadow-emerald-500/25' :
+                            businessType === 'clothing' ? 'bg-pink-500 shadow-pink-500/25' :
+                            'bg-indigo-650 shadow-indigo-650/25'
+                          }`}>
+                            <span className="text-lg leading-none">{currentAsset.discount || discount}%</span>
+                            <span className="text-[7px] tracking-wider leading-none uppercase">OFF</span>
+                          </div>
+                        </div>
+
+                        {/* Bottom Section */}
+                        <div className="space-y-4">
+                          <div className="space-y-1">
+                            <h2 className="text-xl font-black text-white leading-tight drop-shadow-md">
+                              {(currentAsset.title || currentAsset.posterHeadline || promoType).toUpperCase()}
+                            </h2>
+                            <h3 className="text-xs font-extrabold text-indigo-300 drop-shadow-sm uppercase">
+                              {currentAsset.product || selectedProduct}
+                            </h3>
+                          </div>
+                          
+                          {/* CTA Overlay Card */}
+                          <div className="py-2.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 text-center text-white font-black text-xs uppercase tracking-widest shadow-md">
+                            SHOP NOW
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-end gap-3 w-full border-t border-slate-850 pt-3">

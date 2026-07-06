@@ -181,10 +181,10 @@ export default function Header() {
         {/* Profile Info */}
         <div className="flex items-center gap-3 pl-2">
           <div className="h-8 w-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400">
-            {currentUser.name.charAt(0)}
+            {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
           </div>
           <div className="hidden lg:block text-left">
-            <p className="text-xs font-semibold text-slate-200 leading-3">{currentUser.name}</p>
+            <p className="text-xs font-semibold text-slate-200 leading-3">{currentUser.name || currentUser.email || 'User'}</p>
             <p className="text-[10px] font-medium text-slate-500 capitalize">{currentUser.businessName}</p>
           </div>
         </div>
