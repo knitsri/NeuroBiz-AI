@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { addMarketingCampaign } from '../services/marketing';
 import { storage } from '../services/firebase';
@@ -59,8 +59,58 @@ export default function Marketing() {
   const { inventory, generateAiCampaign, businessType, currentUser } = useApp();
 
   const [selectedProduct, setSelectedProduct] = useState('');
-  const [promoType, setPromoType] = useState('Clearance Promo');
+  const [promoType, setPromoType] = useState('Clearance Sale');
   const [discount, setDiscount] = useState(20);
+
+  // Synchronize dynamic initial promotion type based on business category
+  useEffect(() => {
+    if (businessType === 'restaurant') {
+      setPromoType("Chef's Special");
+    } else if (businessType === 'pharmacy') {
+      setPromoType("Wellness Week");
+    } else {
+      setPromoType("Clearance Sale");
+    }
+  }, [businessType]);
+
+  const getCampaignTypes = () => {
+    if (businessType === 'restaurant') {
+      return [
+        "Chef's Special",
+        "Today's Special",
+        "Weekend Special",
+        "Combo Offer",
+        "Family Feast",
+        "Lunch Special",
+        "Dinner Delight",
+        "Happy Hours",
+        "Festival Special",
+        "Limited Time Offer",
+        "Buy 1 Get 1"
+      ];
+    } else if (businessType === 'pharmacy') {
+      return [
+        "Health Awareness",
+        "Wellness Week",
+        "Seasonal Offer",
+        "Medicine Discount",
+        "Combo Savings",
+        "Festival Offer",
+        "Limited Time"
+      ];
+    } else {
+      return [
+        "Clearance Sale",
+        "Flat Discount",
+        "Buy 2 Get 1",
+        "New Arrivals",
+        "End of Season Sale",
+        "Festive Collection",
+        "Weekend Sale",
+        "Flash Sale"
+      ];
+    }
+  };
   
   // Load states
   const [isGenerating, setIsGenerating] = useState(false);
@@ -587,20 +637,33 @@ export default function Marketing() {
           </h3>
 
           <form onSubmit={handleGenerate} className="space-y-4">
-            {/* SKU Dropdown */}
+            {/* SKU Input / Dropdown based on businessType */}
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Target SKU / Product</label>
-              <select
-                required
-                value={selectedProduct}
-                onChange={(e) => setSelectedProduct(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs transition-colors cursor-pointer"
-              >
-                <option value="" disabled>Select an item...</option>
-                {inventory.map(item => (
-                  <option key={item.id} value={item.name}>{item.name} ({item.status})</option>
-                ))}
-              </select>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                {businessType === 'restaurant' ? 'Menu Item' : 'Target SKU / Product'}
+              </label>
+              {businessType === 'restaurant' ? (
+                <input
+                  type="text"
+                  required
+                  value={selectedProduct}
+                  onChange={(e) => setSelectedProduct(e.target.value)}
+                  placeholder="Example: Chicken Biryani, Butter Chicken, Paneer Tikka"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs transition-colors"
+                />
+              ) : (
+                <select
+                  required
+                  value={selectedProduct}
+                  onChange={(e) => setSelectedProduct(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs transition-colors cursor-pointer"
+                >
+                  <option value="" disabled>Select an item...</option>
+                  {inventory.map(item => (
+                    <option key={item.id} value={item.name}>{item.name} ({item.status})</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Campaign Category */}
@@ -611,10 +674,9 @@ export default function Marketing() {
                 onChange={(e) => setPromoType(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs transition-colors cursor-pointer"
               >
-                <option value="Clearance Promo">Clearance (Liquidate dead stock)</option>
-                <option value="Seasonal Discount">Seasonal Demand Spike</option>
-                <option value="Flash Sale">Flash Sale (24-hour urgency)</option>
-                <option value="Loyalty Discount">Loyalty Reward Campaign</option>
+                {getCampaignTypes().map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
               </select>
             </div>
 
