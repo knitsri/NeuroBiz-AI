@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { 
@@ -10,7 +10,9 @@ import {
   ShieldCheck,
   Activity,
   FileCheck2,
-  TrendingUp
+  TrendingUp,
+  Check,
+  X
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -22,8 +24,21 @@ import {
 } from 'recharts';
 
 export default function VendorDashboard() {
-  const { procurementRequests, currentUser } = useApp();
+  const { procurementRequests, currentUser, handleVendorAction } = useApp();
   const navigate = useNavigate();
+  const [actionAlert, setActionAlert] = useState('');
+
+  const handleAction = async (requestId, item, action) => {
+    try {
+      await handleVendorAction(requestId, action);
+      setActionAlert(`Order for ${item} has been ${action === 'accept' ? 'Approved & Shipped' : 'Rejected'}.`);
+      setTimeout(() => setActionAlert(''), 4000);
+    } catch (err) {
+      console.error(err);
+      setActionAlert(`Failed to update order: ${err.message}`);
+      setTimeout(() => setActionAlert(''), 4000);
+    }
+  };
 
   // Metrics
   const pendingRequests = procurementRequests.filter(r => r.status === 'Pending');
@@ -128,6 +143,14 @@ export default function VendorDashboard() {
               </button>
             </div>
 
+            {/* Real-time Alert inside Alert Center */}
+            {actionAlert && (
+              <div className="mb-4 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold animate-in fade-in duration-305 flex items-center justify-between">
+                <span>{actionAlert}</span>
+                <button onClick={() => setActionAlert('')} className="text-slate-500 hover:text-slate-350 cursor-pointer font-bold text-xs pl-2">×</button>
+              </div>
+            )}
+
             {pendingCount === 0 ? (
               <div className="py-16 text-center flex flex-col items-center justify-center">
                 <FileCheck2 className="h-10 w-10 text-slate-700 mb-2" />
@@ -139,7 +162,7 @@ export default function VendorDashboard() {
                 {pendingRequests.slice(0, 3).map((req) => (
                   <div 
                     key={req.id}
-                    className="p-4 rounded-xl bg-slate-900/60 border border-slate-850 flex items-center justify-between"
+                    className="p-4 rounded-xl bg-slate-900/60 border border-slate-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -150,13 +173,23 @@ export default function VendorDashboard() {
                       </div>
                       <p className="text-[10px] text-slate-500 mt-1">Requested by: <strong className="text-slate-450">{req.businessName}</strong></p>
                     </div>
-
-                    <button
-                      onClick={() => navigate('/vendor/requests')}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-[10px] font-bold text-indigo-455 hover:bg-indigo-600 hover:text-white transition-colors cursor-pointer"
-                    >
-                      Process Order
-                    </button>
+ 
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleAction(req.id, req.item, 'reject')}
+                        className="px-2.5 py-1.5 rounded-lg border border-rose-500/20 text-rose-455 hover:bg-rose-500/10 text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        <span>Reject</span>
+                      </button>
+                      <button
+                        onClick={() => handleAction(req.id, req.item, 'accept')}
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-md shadow-emerald-600/10"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        <span>Approve</span>
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {pendingCount > 3 && (

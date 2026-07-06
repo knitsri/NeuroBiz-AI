@@ -531,6 +531,7 @@ export const AppProvider = ({ children }) => {
       businessType,
       inventory,
       procurementRequests,
+      vendorsList,
       marketingCampaigns,
       notifications,
       lastScanResults,

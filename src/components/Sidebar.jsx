@@ -1,13 +1,13 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { 
-  LayoutDashboard, 
-  Boxes, 
-  ShoppingCart, 
-  Megaphone, 
-  User, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Boxes,
+  ShoppingCart,
+  Megaphone,
+  User,
+  LogOut,
   Brain,
   FileText,
   Activity
@@ -64,8 +64,8 @@ export default function Sidebar() {
               to={link.path}
               className={({ isActive }) => `
                 flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-medium text-sm group
-                ${isActive 
-                  ? 'bg-gradient-to-r from-indigo-500/20 to-indigo-500/5 text-indigo-300 border border-indigo-500/20' 
+                ${isActive
+                  ? 'bg-gradient-to-r from-indigo-500/20 to-indigo-500/5 text-indigo-300 border border-indigo-500/20'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'}
               `}
             >
@@ -86,12 +86,12 @@ export default function Sidebar() {
       <div className="p-4 border-t border-slate-800/80">
         <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/40 border border-slate-800/50 mb-3">
           <div className="h-9 w-9 rounded-lg bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center font-bold text-white shadow-md">
-            {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
+            {(currentUser?.name || currentUser?.email || 'U').charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-slate-200 truncate">{currentUser.name || currentUser.email || 'User'}</p>
+            <p className="text-xs font-semibold text-slate-200 truncate">{currentUser?.name || currentUser?.email || 'User'}</p>
             <p className="text-[10px] text-slate-500 font-medium capitalize truncate">
-              {activeRole} • {currentUser.businessType}
+              {activeRole} • {currentUser?.businessType || 'N/A'}
             </p>
           </div>
         </div>

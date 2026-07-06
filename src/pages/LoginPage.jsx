@@ -2,8 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { motion } from 'framer-motion';
-import { Brain, Lock, Mail, ArrowRight, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Brain, Lock, Mail, ArrowRight, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { signUpUser, loginUser } from '../services/auth';
+
+const defaultDemoAccounts = {
+  // Owners
+  'owner-pharmacy@neurobiz.com': { name: 'Nitya Patel', businessName: 'NeuroBiz Pharmacy', role: 'owner', type: 'pharmacy' },
+  'owner-restaurant@neurobiz.com': { name: 'Nitya Patel', businessName: 'NeuroBiz Restaurant', role: 'owner', type: 'restaurant' },
+  'owner-clothing@neurobiz.com': { name: 'Nitya Patel', businessName: 'NeuroBiz Clothing', role: 'owner', type: 'clothing' },
+
+  // Pharmacy Vendors
+  'vendor@biomedsupplies.com': { name: 'Alex Rivera', businessName: 'BioMed Supplies', role: 'vendor', type: 'pharmacy' },
+  'vendor@pharmadistribute.com': { name: 'John Pharma', businessName: 'PharmaDistribute Co.', role: 'vendor', type: 'pharmacy' },
+  'vendor@apexpharma.com': { name: 'Apex Agent', businessName: 'Apex Pharma', role: 'vendor', type: 'pharmacy' },
+
+  // Restaurant Vendors
+  'vendor@metrofoodservices.com': { name: 'Metro Agent', businessName: 'Metro Food Services', role: 'vendor', type: 'restaurant' },
+  'vendor@oceanfresh.com': { name: 'Ocean Agent', businessName: 'Ocean Fresh Seafood', role: 'vendor', type: 'restaurant' },
+  'vendor@greengrow.com': { name: 'Grower Agent', businessName: 'GreenGrow Organics', role: 'vendor', type: 'restaurant' },
+
+  // Clothing Vendors
+  'vendor@texstyleapparel.com': { name: 'Style Agent', businessName: 'TexStyle Apparel', role: 'vendor', type: 'clothing' },
+  'vendor@urbanwear.com': { name: 'Urban Agent', businessName: 'Urban Wear Wholesalers', role: 'vendor', type: 'clothing' },
+  'vendor@eliteaccessories.com': { name: 'Elite Agent', businessName: 'Elite Accessories', role: 'vendor', type: 'clothing' }
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -22,6 +44,8 @@ export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showDemoHelper, setShowDemoHelper] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Auto populate values for demo accounts on switch
   useEffect(() => {
@@ -45,6 +69,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      let finalRole = role;
       if (isRegistering) {
         const finalName = name || (role === 'owner' ? 'Nitya Patel' : 'Alex Rivera');
         const finalBizName = businessName || (role === 'owner' 
@@ -53,10 +78,31 @@ export default function LoginPage() {
 
         await signUpUser(email, password, role, bizType, finalBizName, finalName);
       } else {
-        await loginUser(email, password);
+        let profile;
+        try {
+          profile = await loginUser(email, password);
+        } catch (err) {
+          // If the demo user doesn't exist yet, automatically create it!
+          const demoAccount = defaultDemoAccounts[email.toLowerCase()];
+          if (demoAccount && password === 'password123') {
+            profile = await signUpUser(
+              email, 
+              password, 
+              demoAccount.role, 
+              demoAccount.type, 
+              demoAccount.businessName, 
+              demoAccount.name
+            );
+          } else {
+            throw err;
+          }
+        }
+        if (profile && profile.role) {
+          finalRole = profile.role;
+        }
       }
 
-      if (role === 'owner') {
+      if (finalRole === 'owner') {
         navigate('/owner/dashboard');
       } else {
         navigate('/vendor/dashboard');
@@ -70,30 +116,6 @@ export default function LoginPage() {
           : 'Account not found. Please register an account first using the "Create new company" link below.';
       }
       setError(errMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickLogin = async (demoRole) => {
-    setError('');
-    setLoading(true);
-
-    const demoEmail = demoRole === 'owner' 
-      ? `owner-${bizType}@neurobiz.com` 
-      : 'vendor@biomedsupplies.com';
-    const demoPassword = 'password123';
-
-    try {
-      await loginUser(demoEmail, demoPassword);
-      if (demoRole === 'owner') {
-        navigate('/owner/dashboard');
-      } else {
-        navigate('/vendor/dashboard');
-      }
-    } catch (err) {
-      console.error(err);
-      setError('Demo account not found in your Firebase project. Please click "Create new company" below to register this email first.');
     } finally {
       setLoading(false);
     }
@@ -122,10 +144,10 @@ export default function LoginPage() {
           className="glass rounded-3xl p-8 border border-slate-800 shadow-2xl"
         >
           <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-slate-200">{isRegistering ? 'Create Demo Account' : 'Welcome Back'}</h2>
-            <p className="text-xs text-slate-400 mt-1.5">
-              {isRegistering ? 'Sign up to experience the AI co-pilot' : 'Access your Executive Business Terminal'}
-            </p>
+            <h2 className="text-2xl font-extrabold text-slate-200 tracking-tight">
+              {isRegistering ? 'Register Page' : 'Login Page'}
+            </h2>
+            <div className="h-0.5 w-12 bg-indigo-500 mx-auto my-3 rounded-full"></div>
           </div>
 
           {error && (
@@ -133,24 +155,6 @@ export default function LoginPage() {
               {error}
             </div>
           )}
-
-          {/* Role selector tab in Login */}
-          <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-900 border border-slate-800/80 mb-6">
-            <button
-              type="button"
-              onClick={() => { setRole('owner'); setIsRegistering(false); }}
-              className={`py-2 text-xs font-semibold rounded-lg transition-all duration-300 cursor-pointer ${role === 'owner' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              Business Owner
-            </button>
-            <button
-              type="button"
-              onClick={() => { setRole('vendor'); setIsRegistering(false); }}
-              className={`py-2 text-xs font-semibold rounded-lg transition-all duration-300 cursor-pointer ${role === 'vendor' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              Vendor Partner
-            </button>
-          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegistering && (
@@ -200,13 +204,24 @@ export default function LoginPage() {
               <div className="relative">
                 <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs transition-colors"
+                  className="w-full pl-10 pr-10 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs transition-colors"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 h-5 w-5 text-slate-550 hover:text-slate-350 cursor-pointer flex items-center justify-center animate-in fade-in"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -226,41 +241,103 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Quick Demo Logins Section */}
-          <div className="mt-6 pt-5 border-t border-slate-800/80">
-            <div className="text-center mb-3">
-              <span className="text-[10px] font-bold text-indigo-400 tracking-widest uppercase flex items-center justify-center gap-1">
-                <ShieldCheck className="h-3.5 w-3.5" /> Sandbox Hackathon Quick Access
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('owner')}
-                className="py-2.5 px-3 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-[10px] font-bold text-slate-300 cursor-pointer transition-all duration-300"
-              >
-                Owner Demo (Auto)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('vendor')}
-                className="py-2.5 px-3 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-[10px] font-bold text-slate-300 cursor-pointer transition-all duration-300"
-              >
-                Vendor Demo (Auto)
-              </button>
-            </div>
-          </div>
-
           {/* Switch Register/Login */}
-          <div className="text-center mt-5">
+          <div className="text-center mt-6 pt-4 border-t border-slate-800/80">
             <button
               type="button"
               onClick={() => setIsRegistering(!isRegistering)}
               className="text-[10px] font-bold text-slate-500 hover:text-slate-300 uppercase tracking-wider cursor-pointer"
             >
-              {isRegistering ? 'Already have an account? Sign In' : 'Create new mock company'}
+              {isRegistering ? 'Already have an account? Sign In' : 'Sign In'}
             </button>
+          </div>
+
+          {/* Quick Demo Credentials Panel */}
+          <div className="mt-6 bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 text-xs">
+            <button 
+              type="button" 
+              onClick={() => setShowDemoHelper(!showDemoHelper)}
+              className="flex items-center justify-between w-full text-slate-400 font-bold hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              <span>Demo accounts helper</span>
+              <span className="text-[9px] bg-slate-800 px-2 py-0.5 rounded text-slate-400">
+                {showDemoHelper ? 'Hide' : 'Show'}
+              </span>
+            </button>
+
+            {showDemoHelper && (
+              <div className="mt-3.5 space-y-4 animate-in fade-in duration-200 text-[11px] text-left">
+                <div className="border-t border-slate-800/80 pt-3">
+                  <h5 className="font-bold text-indigo-400 text-[9px] uppercase tracking-wider mb-2">Pharmacy Network</h5>
+                  <div className="space-y-1.5 text-slate-400">
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">Owner:</span>
+                      <code className="text-slate-300 select-all">owner-pharmacy@neurobiz.com</code>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">BioMed:</span>
+                      <code className="text-slate-300 select-all">vendor@biomedsupplies.com</code>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">PharmaDistribute:</span>
+                      <code className="text-slate-300 select-all">vendor@pharmadistribute.com</code>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">Apex Pharma:</span>
+                      <code className="text-slate-300 select-all">vendor@apexpharma.com</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800/80 pt-3">
+                  <h5 className="font-bold text-indigo-400 text-[9px] uppercase tracking-wider mb-2">Restaurant Network</h5>
+                  <div className="space-y-1.5 text-slate-400">
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">Owner:</span>
+                      <code className="text-slate-300 select-all">owner-restaurant@neurobiz.com</code>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">Metro Food:</span>
+                      <code className="text-slate-300 select-all">vendor@metrofoodservices.com</code>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">Ocean Fresh:</span>
+                      <code className="text-slate-300 select-all">vendor@oceanfresh.com</code>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">GreenGrow:</span>
+                      <code className="text-slate-300 select-all">vendor@greengrow.com</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800/80 pt-3">
+                  <h5 className="font-bold text-indigo-400 text-[9px] uppercase tracking-wider mb-2">Clothing Network</h5>
+                  <div className="space-y-1.5 text-slate-400">
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">Owner:</span>
+                      <code className="text-slate-300 select-all">owner-clothing@neurobiz.com</code>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">TexStyle Apparel:</span>
+                      <code className="text-slate-300 select-all">vendor@texstyleapparel.com</code>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">Urban Wear:</span>
+                      <code className="text-slate-300 select-all">vendor@urbanwear.com</code>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
+                      <span className="text-slate-500">Elite Accessories:</span>
+                      <code className="text-slate-300 select-all">vendor@eliteaccessories.com</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800/80 pt-3 text-[10px] text-emerald-400 font-semibold text-center uppercase tracking-wider">
+                  Password: <code className="text-slate-200 select-all lowercase font-bold">password123</code>
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>

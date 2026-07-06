@@ -1,30 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { 
-  Bell, 
-  User, 
-  ShieldAlert, 
-  CheckCircle2, 
-  Clock, 
-  Info, 
-  XCircle 
+import {
+  Bell,
+  User,
+  ShieldAlert,
+  CheckCircle2,
+  Clock,
+  Info,
+  XCircle
 } from 'lucide-react';
 
 export default function Header() {
-  const { 
-    currentUser, 
-    activeRole, 
-    notifications, 
-    markNotificationsAsRead 
+  const {
+    currentUser,
+    activeRole,
+    notifications,
+    markNotificationsAsRead
   } = useApp();
   const location = useLocation();
-  
+
   // Clock state
   const [timeStr, setTimeStr] = useState('');
   const [dayStr, setDayStr] = useState('');
   const [dateStr, setDateStr] = useState('');
-  
+
   // Dropdown toggles
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -32,7 +32,7 @@ export default function Header() {
   useEffect(() => {
     const updateClock = () => {
       const now = new Date();
-      
+
       // Time: HH:MM:SS AM/PM
       let hours = now.getHours();
       const minutes = String(now.getMinutes()).padStart(2, '0');
@@ -41,7 +41,7 @@ export default function Header() {
       hours = hours % 12;
       hours = hours ? hours : 12;
       const hoursStr = String(hours).padStart(2, '0');
-      
+
       setTimeStr(`${hoursStr}:${minutes}:${seconds} ${ampm}`);
 
       // Day
@@ -50,7 +50,7 @@ export default function Header() {
 
       // Date: Month DD, YYYY
       const months = [
-        'January', 'February', 'March', 'April', 'May', 'June', 
+        'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
       ];
       setDateStr(`${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`);
@@ -123,11 +123,10 @@ export default function Header() {
 
         {/* Notifications Icon & Dropdown */}
         <div className="relative">
-          <button 
+          <button
             onClick={handleNotificationsToggle}
-            className={`relative p-2 rounded-lg cursor-pointer transition-all duration-300 ${
-              showNotifications ? 'text-indigo-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
+            className={`relative p-2 rounded-lg cursor-pointer transition-all duration-300 ${showNotifications ? 'text-indigo-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
           >
             <Bell className="h-5 w-5" />
             {unreadNotifCount > 0 && (
@@ -137,7 +136,7 @@ export default function Header() {
               <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-indigo-500"></span>
             )}
           </button>
-          
+
           {/* Notifications Dropdown Panel */}
           {showNotifications && (
             <div className="absolute right-0 mt-3.5 w-80 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-1 z-50 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200">
@@ -147,7 +146,7 @@ export default function Header() {
                   {notifications.length} Logs
                 </span>
               </div>
-              
+
               <div className="max-h-64 overflow-y-auto divide-y divide-slate-850/60">
                 {notifications.length === 0 ? (
                   <div className="p-8 text-center">
@@ -155,11 +154,10 @@ export default function Header() {
                   </div>
                 ) : (
                   notifications.map((notif) => (
-                    <div 
+                    <div
                       key={notif.id}
-                      className={`p-3 text-[11px] font-medium leading-relaxed transition-all flex gap-3 items-start cursor-pointer hover:bg-slate-850/30 ${
-                        notif.read ? 'text-slate-450' : 'text-slate-200 bg-indigo-500/5'
-                      }`}
+                      className={`p-3 text-[11px] font-medium leading-relaxed transition-all flex gap-3 items-start cursor-pointer hover:bg-slate-850/30 ${notif.read ? 'text-slate-450' : 'text-slate-200 bg-indigo-500/5'
+                        }`}
                     >
                       {getNotifIcon(notif.type)}
                       <div className="flex-1 min-w-0">
@@ -181,11 +179,11 @@ export default function Header() {
         {/* Profile Info */}
         <div className="flex items-center gap-3 pl-2">
           <div className="h-8 w-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400">
-            {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
+            {(currentUser?.name || currentUser?.email || 'U').charAt(0).toUpperCase()}
           </div>
           <div className="hidden lg:block text-left">
-            <p className="text-xs font-semibold text-slate-200 leading-3">{currentUser.name || currentUser.email || 'User'}</p>
-            <p className="text-[10px] font-medium text-slate-500 capitalize">{currentUser.businessName}</p>
+            <p className="text-xs font-semibold text-slate-200 leading-3">{currentUser?.name || currentUser?.email || 'User'}</p>
+            <p className="text-[10px] font-medium text-slate-500 capitalize">{currentUser?.businessName || 'Business'}</p>
           </div>
         </div>
       </div>

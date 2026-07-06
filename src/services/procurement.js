@@ -38,6 +38,27 @@ export async function approveRecommendation(ownerUid, rec, businessName, busines
       `Reorder request for ${rec.name} (${rec.recommendedStock} units) sent to ${rec.vendor}.`
     );
 
+    // Notify Vendor of the new incoming request in real-time
+    try {
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('role', '==', 'vendor'),
+        where('businessName', '==', rec.vendor)
+      );
+      const userSnapshot = await getDocs(usersQuery);
+      if (!userSnapshot.empty) {
+        const vendorUid = userSnapshot.docs[0].id;
+        await addNotification(
+          vendorUid,
+          'info',
+          'Inbound Order Request',
+          `New procurement request from ${businessName} for ${rec.name} (${rec.recommendedStock} units).`
+        );
+      }
+    } catch (err) {
+      console.error('Failed to notify vendor user:', err);
+    }
+
     return docRef.id;
   } catch (error) {
     console.error('Error in approveRecommendation:', error);
@@ -86,6 +107,14 @@ export async function handleVendorAction(requestId, action, ownerUid) {
       requestData.ownerUid,
       action === 'accept' ? 'Procurement Approved' : 'Procurement Rejected',
       `Vendor ${requestData.vendor} has ${action === 'accept' ? 'accepted and shipped' : 'rejected'} order of ${requestData.item}.`,
+      action === 'accept' ? 'success' : 'warning'
+    );
+
+    // Notify Vendor of the action taken
+    await addNotification(
+      ownerUid,
+      action === 'accept' ? 'Order Approved & Shipped' : 'Order Rejected',
+      `You have ${action === 'accept' ? 'approved and shipped' : 'rejected'} the order of ${requestData.item} (${requestData.quantity} units) to ${requestData.businessName}.`,
       action === 'accept' ? 'success' : 'warning'
     );
 
@@ -142,8 +171,7 @@ export async function handleVendorAction(requestId, action, ownerUid) {
 export function subscribeToOwnerProcurements(ownerUid, callback) {
   const q = query(
     collection(db, 'procurements'), 
-    where('ownerUid', '==', ownerUid),
-    orderBy('createdAt', 'desc')
+    where('ownerUid', '==', ownerUid)
   );
 
   return onSnapshot(q, (snapshot) => {
@@ -151,6 +179,8 @@ export function subscribeToOwnerProcurements(ownerUid, callback) {
     snapshot.forEach((doc) => {
       reqs.push({ id: doc.id, ...doc.data() });
     });
+    // Sort in-memory descending by createdAt
+    reqs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     callback(reqs);
   });
 }
@@ -159,8 +189,7 @@ export function subscribeToOwnerProcurements(ownerUid, callback) {
 export function subscribeToVendorProcurements(vendorName, callback) {
   const q = query(
     collection(db, 'procurements'), 
-    where('vendor', '==', vendorName),
-    orderBy('createdAt', 'desc')
+    where('vendor', '==', vendorName)
   );
 
   return onSnapshot(q, (snapshot) => {
@@ -168,6 +197,8 @@ export function subscribeToVendorProcurements(vendorName, callback) {
     snapshot.forEach((doc) => {
       reqs.push({ id: doc.id, ...doc.data() });
     });
+    // Sort in-memory descending by createdAt
+    reqs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     callback(reqs);
   });
 }
