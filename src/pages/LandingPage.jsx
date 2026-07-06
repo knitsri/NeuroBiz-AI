@@ -23,13 +23,11 @@ export default function LandingPage() {
     if (!selectedRole) return;
 
     if (selectedRole === 'vendor') {
-      // Vendor initialization (doesn't need a specific biz type, defaults to pharmacy vendors or general)
-      initializeBusiness('pharmacy', 'vendor', 'Alex Rivera', 'vendor@pharma-distribute.com', 'BioMed Supplies');
-      navigate('/vendor/dashboard');
+      navigate('/login?role=vendor');
     } else {
       if (!selectedBizType) return;
       
-      // Redirect to login page carrying the selections, or direct login for speed
+      // Redirect to login page carrying the selections
       navigate(`/login?role=owner&type=${selectedBizType}`);
     }
   };

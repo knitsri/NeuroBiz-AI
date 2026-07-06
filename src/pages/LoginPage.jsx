@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { motion } from 'framer-motion';
-import { Brain, Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Brain, Lock, Mail, ArrowRight, ShieldCheck, RefreshCw } from 'lucide-react';
+import { signUpUser, loginUser } from '../services/auth';
 
 export default function LoginPage() {
-  const { initializeBusiness } = useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -20,12 +20,15 @@ export default function LoginPage() {
   const [name, setName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Auto populate values for demo accounts on switch
   useEffect(() => {
+    setError('');
     if (!isRegistering) {
       if (role === 'owner') {
-        setEmail(`owner@neurobiz-${bizType}.com`);
+        setEmail(`owner-${bizType}@neurobiz.com`);
         setPassword('password123');
       } else {
         setEmail('vendor@biomedsupplies.com');
@@ -34,31 +37,65 @@ export default function LoginPage() {
     }
   }, [role, bizType, isRegistering]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) return;
 
-    const finalName = name || (role === 'owner' ? 'Nitya Patel' : 'Alex Rivera');
-    const finalBizName = businessName || (role === 'owner' 
-      ? `NeuroBiz ${bizType.charAt(0).toUpperCase() + bizType.slice(1)}` 
-      : 'BioMed Supplies');
+    setError('');
+    setLoading(true);
 
-    initializeBusiness(bizType, role, finalName, email, finalBizName);
-    
-    if (role === 'owner') {
-      navigate('/owner/dashboard');
-    } else {
-      navigate('/vendor/dashboard');
+    try {
+      if (isRegistering) {
+        const finalName = name || (role === 'owner' ? 'Nitya Patel' : 'Alex Rivera');
+        const finalBizName = businessName || (role === 'owner' 
+          ? `NeuroBiz ${bizType.charAt(0).toUpperCase() + bizType.slice(1)}` 
+          : 'BioMed Supplies');
+
+        await signUpUser(email, password, role, bizType, finalBizName, finalName);
+      } else {
+        await loginUser(email, password);
+      }
+
+      if (role === 'owner') {
+        navigate('/owner/dashboard');
+      } else {
+        navigate('/vendor/dashboard');
+      }
+    } catch (err) {
+      console.error(err);
+      let errMsg = err.message || 'Authentication failed. Please check credentials.';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        errMsg = isRegistering 
+          ? 'Failed to register demo account.' 
+          : 'Account not found. Please register an account first using the "Create new company" link below.';
+      }
+      setError(errMsg);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleQuickLogin = (demoRole) => {
-    if (demoRole === 'owner') {
-      initializeBusiness(bizType, 'owner', 'Nitya Patel', `owner@neurobiz-${bizType}.com`, `NeuroBiz ${bizType.charAt(0).toUpperCase() + bizType.slice(1)}`);
-      navigate('/owner/dashboard');
-    } else {
-      initializeBusiness('pharmacy', 'vendor', 'Alex Rivera', 'vendor@biomedsupplies.com', 'BioMed Supplies');
-      navigate('/vendor/dashboard');
+  const handleQuickLogin = async (demoRole) => {
+    setError('');
+    setLoading(true);
+
+    const demoEmail = demoRole === 'owner' 
+      ? `owner-${bizType}@neurobiz.com` 
+      : 'vendor@biomedsupplies.com';
+    const demoPassword = 'password123';
+
+    try {
+      await loginUser(demoEmail, demoPassword);
+      if (demoRole === 'owner') {
+        navigate('/owner/dashboard');
+      } else {
+        navigate('/vendor/dashboard');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Demo account not found in your Firebase project. Please click "Create new company" below to register this email first.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,6 +127,12 @@ export default function LoginPage() {
               {isRegistering ? 'Sign up to experience the AI co-pilot' : 'Access your Executive Business Terminal'}
             </p>
           </div>
+
+          {error && (
+            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-semibold text-center leading-normal">
+              {error}
+            </div>
+          )}
 
           {/* Role selector tab in Login */}
           <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-900 border border-slate-800/80 mb-6">
@@ -169,10 +212,17 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all duration-300 shadow-md shadow-indigo-600/10 cursor-pointer"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white font-bold text-xs transition-all duration-300 shadow-md shadow-indigo-600/10 cursor-pointer disabled:cursor-not-allowed"
             >
-              <span>{isRegistering ? 'Register & Initialize' : 'Sign In to Terminal'}</span>
-              <ArrowRight className="h-4.5 w-4.5" />
+              {loading ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <span>{isRegistering ? 'Register & Initialize' : 'Sign In to Terminal'}</span>
+                  <ArrowRight className="h-4.5 w-4.5" />
+                </>
+              )}
             </button>
           </form>
 

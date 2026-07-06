@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { addMarketingCampaign } from '../services/marketing';
 import { 
   Megaphone, 
   Sparkles, 
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export default function Marketing() {
-  const { inventory, generateMarketingContent, businessType } = useApp();
+  const { inventory, generateAiCampaign, businessType, currentUser } = useApp();
 
   const [selectedProduct, setSelectedProduct] = useState('');
   const [promoType, setPromoType] = useState('Clearance Promo');
@@ -33,7 +34,7 @@ export default function Marketing() {
   const [toastMsg, setToastMsg] = useState('');
 
   // Canvas drawing generator to build base64 Data URLs in real-time matching selections
-  const drawCanvasToDataUrl = (product, promoCat, discPct) => {
+  const drawCanvasToDataUrl = (product, promoCat, discPct, headline = '', subtitle = '', cta = '') => {
     const canvas = document.createElement('canvas');
     canvas.width = 800;
     canvas.height = 1000;
@@ -94,20 +95,23 @@ export default function Marketing() {
     ctx.font = 'bold 11px sans-serif';
     ctx.fillText('SME AUTOPILOT CAMPAIGNS • SECURE DIAGNOSTICS', 50, 100);
 
-    // Main header
+    // Main header (grows with Gemini dynamic title)
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 48px sans-serif';
-    ctx.fillText(`${discPct}% OFF ON ${product.toUpperCase()}!`, 50, 240);
+    ctx.font = '900 36px sans-serif';
+    const displayHeadline = (headline || `${discPct}% OFF ON ${product}!`).toUpperCase();
+    ctx.fillText(displayHeadline, 50, 240);
 
     // Subheader
     ctx.fillStyle = secondaryBrandColor;
-    ctx.font = '800 22px sans-serif';
-    ctx.fillText(`CAMPAIGN STAGE: ${promoCat.toUpperCase()}`, 50, 310);
+    ctx.font = '800 18px sans-serif';
+    const displaySubtitle = (subtitle || `CAMPAIGN STAGE: ${promoCat}`).toUpperCase();
+    ctx.fillText(displaySubtitle, 50, 310);
 
     // Details text
     ctx.fillStyle = '#94a3b8';
-    ctx.font = '500 16px sans-serif';
-    ctx.fillText('AI-compiled promotional asset designed to boost local engagement.', 50, 400);
+    ctx.font = '500 14px sans-serif';
+    const displayCta = cta || 'AI-compiled promotional asset designed to boost local engagement.';
+    ctx.fillText(displayCta, 50, 400);
     ctx.fillText('Redeem this voucher at checkout or verify details with manager.', 50, 430);
 
     // Circular badge
@@ -158,55 +162,95 @@ export default function Marketing() {
     return canvas.toDataURL('image/png');
   };
 
-  const handleGenerate = (e) => {
+  const handleGenerate = async (e) => {
     e.preventDefault();
     if (!selectedProduct) return;
 
     setIsGenerating(true);
     
-    // Simulate generation delay
-    setTimeout(() => {
-      // 1. Compile copy text details
-      const textAsset = generateMarketingContent(selectedProduct, promoType, discount);
+    try {
+      // 1. Call async campaign generator in AppContext
+      const aiCampaign = await generateAiCampaign(selectedProduct, promoType, discount);
       
-      // 2. Generate dynamic Canvas base64 images (completely decoupled matching user criteria)
-      const posterData = drawCanvasToDataUrl(selectedProduct, promoType, discount);
+      // 2. Generate dynamic Canvas base64 images using Gemini's copy headlines!
+      const posterData = drawCanvasToDataUrl(
+        selectedProduct, 
+        promoType, 
+        discount,
+        aiCampaign.posterHeadline,
+        aiCampaign.posterSubtitle,
+        aiCampaign.callToAction
+      );
 
       // 3. Set to state (guarantees preview & download match exactly!)
       setCurrentAsset({
-        ...textAsset,
+        ...aiCampaign,
         posterUrl: posterData
       });
+
+      // 4. Save campaign to Firestore
+      if (currentUser) {
+        await addMarketingCampaign(currentUser.uid, {
+          product: selectedProduct,
+          posterUrl: posterData,
+          instagram: aiCampaign.instagramCaption,
+          whatsapp: aiCampaign.whatsappPromotion
+        });
+      }
       
-      setIsGenerating(false);
       setToastMsg('AI Marketing Kit compiled successfully!');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
-    }, 1550);
+    } catch (err) {
+      console.error(err);
+      alert("AI Campaign generation failed: " + (err.message || err));
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleRegenerateItem = () => {
+  const handleRegenerateItem = async () => {
     if (!currentAsset) return;
     
     setIsRegeneratingPoster(true);
 
-    setTimeout(() => {
-      // Generate matching canvas data with slightly offset discount or values for presentation
+    try {
       const offsetDiscount = Math.min(Number(discount) + (Math.random() > 0.5 ? 5 : -5), 75);
-      const newImgData = drawCanvasToDataUrl(selectedProduct, promoType, offsetDiscount);
       
-      setCurrentAsset(prev => ({
-        ...prev,
-        title: `${offsetDiscount}% OFF on ${selectedProduct}!`,
-        discount: offsetDiscount,
+      const aiCampaign = await generateAiCampaign(selectedProduct, promoType, offsetDiscount);
+      
+      const newImgData = drawCanvasToDataUrl(
+        selectedProduct, 
+        promoType, 
+        offsetDiscount,
+        aiCampaign.posterHeadline,
+        aiCampaign.posterSubtitle,
+        aiCampaign.callToAction
+      );
+      
+      setCurrentAsset({
+        ...aiCampaign,
         posterUrl: newImgData
-      }));
+      });
 
-      setIsRegeneratingPoster(false);
-      setToastMsg(`Regenerated alternative Poster visual!`);
+      if (currentUser) {
+        await addMarketingCampaign(currentUser.uid, {
+          product: selectedProduct,
+          posterUrl: newImgData,
+          instagram: aiCampaign.instagramCaption,
+          whatsapp: aiCampaign.whatsappPromotion
+        });
+      }
+      
+      setToastMsg('AI Marketing Kit regenerated!');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
-    }, 850);
+    } catch (err) {
+      console.error(err);
+      alert("AI Campaign regeneration failed: " + (err.message || err));
+    } finally {
+      setIsRegeneratingPoster(false);
+    }
   };
 
   const copyToClipboard = (text, type) => {

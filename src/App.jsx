@@ -66,6 +66,17 @@ function LayoutWrapper({ children }) {
 }
 
 function AppRoutes() {
+  const { authLoading } = useApp();
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
+        <div className="h-10 w-10 border-4 border-slate-855 border-t-indigo-500 rounded-full animate-spin"></div>
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-4">Syncing Security Session...</p>
+      </div>
+    );
+  }
+
   return (
     <LayoutWrapper>
       <Routes>

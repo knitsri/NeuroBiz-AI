@@ -11,10 +11,11 @@ import {
 } from 'lucide-react';
 
 export default function AIAssistantPanel() {
-  const { getAiChatResponse, currentUser, businessType } = useApp();
+  const { askAiAssistant, currentUser, businessType } = useApp();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [chatInput, setChatInput] = useState('');
+  const [isAiResponding, setIsAiResponding] = useState(false);
   const [chatMessages, setChatMessages] = useState([
     { 
       sender: 'ai', 
@@ -32,19 +33,27 @@ export default function AIAssistantPanel() {
 
   if (!currentUser) return null;
 
-  const handleSendMessage = (text) => {
-    if (!text.trim()) return;
+  const handleSendMessage = async (text) => {
+    if (!text.trim() || isAiResponding) return;
 
     // User message
     const updated = [...chatMessages, { sender: 'user', text }];
     setChatMessages(updated);
     setChatInput('');
+    setIsAiResponding(true);
 
-    // AI thinking delay
-    setTimeout(() => {
-      const response = getAiChatResponse(text);
+    try {
+      const response = await askAiAssistant(text);
       setChatMessages(prev => [...prev, { sender: 'ai', text: response }]);
-    }, 700);
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [
+        ...prev, 
+        { sender: 'ai', text: `Connection issue: ${err.message || err}` }
+      ]);
+    } finally {
+      setIsAiResponding(false);
+    }
   };
 
   const presetQuestions = [
@@ -147,6 +156,15 @@ export default function AIAssistantPanel() {
                       )}
                     </div>
                   ))}
+                  {isAiResponding && (
+                    <div className="flex justify-start">
+                      <div className="bg-slate-900 border border-slate-850 rounded-2xl rounded-tl-none px-3.5 py-2 text-slate-400 text-xs flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 bg-indigo-500 rounded-full animate-bounce"></span>
+                        <span className="h-1.5 w-1.5 bg-indigo-500 rounded-full animate-bounce delay-150"></span>
+                        <span className="h-1.5 w-1.5 bg-indigo-500 rounded-full animate-bounce delay-300"></span>
+                      </div>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
 
@@ -167,15 +185,17 @@ export default function AIAssistantPanel() {
                 <div className="p-3 border-t border-slate-850 bg-slate-950/40 relative">
                   <input
                     type="text"
+                    disabled={isAiResponding}
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(chatInput)}
-                    placeholder="Query inventory, reorder updates, risk tags..."
-                    className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors"
+                    placeholder={isAiResponding ? "AI is typing..." : "Query inventory, reorder updates, risk tags..."}
+                    className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <button
+                    disabled={isAiResponding || !chatInput.trim()}
                     onClick={() => handleSendMessage(chatInput)}
-                    className="absolute right-5 top-5 p-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors cursor-pointer"
+                    className="absolute right-5 top-5 p-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors cursor-pointer disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed"
                   >
                     <CornerDownLeft className="h-3 w-3" />
                   </button>

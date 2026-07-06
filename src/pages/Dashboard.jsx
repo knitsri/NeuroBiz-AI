@@ -28,6 +28,101 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
+function RecommendationCard({ item }) {
+  const navigate = useNavigate();
+  const { title, description, businessImpact, expectedResult, recommendation, observation, suggestedAction, priority, category } = item;
+
+  let buttonText = '';
+  let buttonRoute = '';
+
+  const catLower = (category || '').toLowerCase();
+  if (catLower === 'inventory') {
+    buttonText = 'Open Inventory';
+    buttonRoute = '/owner/inventory';
+  } else if (catLower === 'procurement') {
+    buttonText = 'Open Procurement';
+    buttonRoute = '/owner/procurement';
+  } else if (catLower === 'marketing') {
+    buttonText = 'Open AI Marketing Studio';
+    buttonRoute = '/owner/marketing';
+  } else if (catLower === 'profile') {
+    buttonText = 'Open Profile';
+    buttonRoute = '/owner/profile';
+  } else if (catLower === 'operations') {
+    buttonText = 'Open Procurement';
+    buttonRoute = '/owner/procurement';
+  }
+
+  const getPriorityStyle = (p) => {
+    const pLower = (p || '').toLowerCase();
+    if (pLower === 'high') return 'bg-rose-500/10 text-rose-400 border border-rose-500/25';
+    if (pLower === 'medium') return 'bg-amber-500/10 text-amber-400 border border-amber-500/25';
+    return 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/25';
+  };
+
+  return (
+    <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-850 hover:border-slate-800 transition-all duration-300 flex flex-col justify-between gap-3 relative overflow-hidden group">
+      <div className="space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <h5 className="text-[11px] font-bold text-slate-200 line-clamp-2 group-hover:text-indigo-400 transition-colors leading-snug">{title}</h5>
+          {priority && (
+            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider shrink-0 ${getPriorityStyle(priority)}`}>
+              {priority}
+            </span>
+          )}
+        </div>
+
+        <p className="text-[10px] text-slate-400 leading-normal font-medium">{description}</p>
+
+        {businessImpact && (
+          <div className="text-[9px] font-semibold text-slate-500 leading-normal border-t border-slate-850/60 pt-1.5 mt-1.5">
+            <span className="text-rose-400/90 font-bold uppercase tracking-wider text-[8px] block mb-0.5">🚨 Business Impact</span>
+            {businessImpact}
+          </div>
+        )}
+
+        {expectedResult && (
+          <div className="text-[9px] font-semibold text-slate-500 leading-normal border-t border-slate-850/60 pt-1.5 mt-1.5">
+            <span className="text-emerald-400/90 font-bold uppercase tracking-wider text-[8px] block mb-0.5">Expected Result</span>
+            {expectedResult}
+          </div>
+        )}
+
+        {recommendation && (
+          <div className="text-[9px] font-semibold text-slate-500 leading-normal border-t border-slate-850/60 pt-1.5 mt-1.5">
+            <span className="text-indigo-400/90 font-bold uppercase tracking-wider text-[8px] block mb-0.5">💰 Recommendation</span>
+            {recommendation}
+          </div>
+        )}
+
+        {observation && (
+          <div className="text-[9px] font-semibold text-slate-500 leading-normal border-t border-slate-850/60 pt-1.5 mt-1.5">
+            <span className="text-slate-400 font-bold uppercase tracking-wider text-[8px] block mb-0.5">🧠 Observation</span>
+            {observation}
+          </div>
+        )}
+
+        {suggestedAction && (
+          <div className="text-[9px] font-semibold text-indigo-300 leading-normal bg-indigo-950/20 border border-indigo-900/30 rounded-lg p-2 mt-1.5">
+            <span className="text-indigo-400 font-bold uppercase tracking-wider text-[8px] block mb-0.5">Suggested Action</span>
+            {suggestedAction}
+          </div>
+        )}
+      </div>
+
+      {buttonText && buttonRoute && (
+        <button
+          onClick={() => navigate(buttonRoute)}
+          className="w-full py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/20 hover:border-indigo-500 text-[8px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1 cursor-pointer mt-2"
+        >
+          <span>{buttonText}</span>
+          <ArrowRight className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const {
     inventory,
@@ -45,6 +140,7 @@ export default function Dashboard() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanStep, setScanStep] = useState(0);
   const [scanComplete, setScanComplete] = useState(false);
+  const [scanPromise, setScanPromise] = useState(null);
 
   const scanSteps = [
     'Analyzing Inventory...',
@@ -56,10 +152,11 @@ export default function Dashboard() {
     'Preparing Final Report...'
   ];
 
-  const handleStartScan = () => {
+  const handleStartScan = (force = false) => {
     setIsScanning(true);
     setScanStep(0);
     setScanComplete(false);
+    setScanPromise(runAiScan(force));
   };
 
   // Run the multi-step scan animation
@@ -70,11 +167,21 @@ export default function Dashboard() {
       }, 600); // 7 steps * 600ms = 4.2 seconds
       return () => clearTimeout(timer);
     } else if (isScanning && scanStep === scanSteps.length) {
-      runAiScan();
-      setIsScanning(false);
-      setScanComplete(true);
+      if (scanPromise) {
+        scanPromise.then(() => {
+          setIsScanning(false);
+          setScanComplete(true);
+        }).catch((err) => {
+          console.error("AI scan failed:", err);
+          setIsScanning(false);
+          alert("AI Health Scan failed: " + (err.message || err));
+        });
+      } else {
+        setIsScanning(false);
+        setScanComplete(true);
+      }
     }
-  }, [isScanning, scanStep]);
+  }, [isScanning, scanStep, scanPromise]);
 
 
 
@@ -206,11 +313,11 @@ export default function Dashboard() {
 
               {!isScanning && lastScanResults && (
                 <button
-                  onClick={handleStartScan}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all duration-300 shadow-lg shadow-indigo-600/20 cursor-pointer group"
+                  onClick={() => handleStartScan(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-650 hover:bg-indigo-500 text-white text-xs font-bold transition-all duration-300 shadow-lg shadow-indigo-650/20 cursor-pointer group"
                 >
                   <Cpu className="h-4 w-4" />
-                  <span>Run AI Health Scan</span>
+                  <span>Force Rescan</span>
                   <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               )}
@@ -332,7 +439,7 @@ export default function Dashboard() {
                 {/* Big Centered CTA Button */}
                 <div className="mt-6">
                   <button
-                    onClick={handleStartScan}
+                    onClick={() => handleStartScan(false)}
                     className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-indigo-650 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-black transition-all duration-300 shadow-xl shadow-indigo-650/15 hover:shadow-indigo-500/25 cursor-pointer group"
                   >
                     <Cpu className="h-4.5 w-4.5 animate-pulse" />
@@ -413,55 +520,80 @@ export default function Dashboard() {
                 {/* AI Recommendations List */}
                 <div className="flex-1 flex flex-col min-h-0">
                   <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 shrink-0 flex items-center gap-1.5">
-                    <Sparkles className="h-4 w-4" /> AI Tactical Recommendations
+                    <Sparkles className="h-4 w-4" /> AI Health Command Center Recommendations
                   </h3>
 
-                  <div className="flex-1 overflow-y-auto pr-1">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-2">
-                      {lastScanResults.recommendations.map((rec) => (
-                        <div
-                          key={rec.id}
-                          className="p-4 rounded-xl bg-slate-900/60 border border-slate-850 hover:border-slate-800 transition-colors flex flex-col justify-between gap-4"
-                        >
-                          <div>
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${rec.type === 'Low Stock'
-                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                  : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                                }`}>
-                                {rec.type}
-                              </span>
-                              <span className="text-xs font-bold text-slate-300">{rec.item}</span>
-                            </div>
-                            <p className="text-xs text-slate-400 leading-relaxed font-medium">{rec.message}</p>
-
-                            {rec.type === 'Low Stock' && (
-                              <div className="mt-2.5 flex items-center gap-4 text-[10px] font-bold text-slate-500">
-                                <span>Current: <strong className="text-slate-400">{rec.currentStock} Units</strong></span>
-                                <span>Recommended: <strong className="text-indigo-400">+{rec.recommendedQuantity} Units</strong></span>
-                              </div>
-                            )}
-                          </div>
-
-                          <button
-                            onClick={() => handleRecAction(rec)}
-                            className="w-full py-2.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/20 text-[10px] font-bold transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            {rec.type === 'Low Stock' ? (
-                              <>
-                                <span>Submit Reorder Proposal</span>
-                                <ShoppingCart className="h-3 w-3" />
-                              </>
-                            ) : (
-                              <>
-                                <span>Go to Marketing Center</span>
-                                <Megaphone className="h-3 w-3" />
-                              </>
-                            )}
-                          </button>
+                  <div className="flex-1 overflow-y-auto pr-1 space-y-6 pb-4">
+                    {/* 1. Critical Actions */}
+                    {lastScanResults.criticalActions && lastScanResults.criticalActions.length > 0 && (
+                      <div>
+                        <h4 className="text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5 border-b border-rose-500/10 pb-1.5">
+                          <span>🚨 Critical Actions</span>
+                          <span className="h-1.5 w-1.5 bg-rose-500 rounded-full animate-pulse"></span>
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {lastScanResults.criticalActions.map((item, index) => (
+                            <RecommendationCard key={`crit-${index}`} item={item} />
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    )}
+
+                    {/* 2. Growth Opportunities */}
+                    {lastScanResults.growthOpportunities && lastScanResults.growthOpportunities.length > 0 && (
+                      <div>
+                        <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5 border-b border-emerald-500/10 pb-1.5">
+                          <span>📈 Growth Opportunities</span>
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {lastScanResults.growthOpportunities.map((item, index) => (
+                            <RecommendationCard key={`growth-${index}`} item={item} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 3. Cost Optimization */}
+                    {lastScanResults.costOptimization && lastScanResults.costOptimization.length > 0 && (
+                      <div>
+                        <h4 className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5 border-b border-amber-500/10 pb-1.5">
+                          <span>💰 Cost Optimization</span>
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {lastScanResults.costOptimization.map((item, index) => (
+                            <RecommendationCard key={`cost-${index}`} item={item} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 4. Business Insights */}
+                    {lastScanResults.businessInsights && lastScanResults.businessInsights.length > 0 && (
+                      <div>
+                        <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5 border-b border-indigo-500/10 pb-1.5">
+                          <span>🧠 Business Insights</span>
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {lastScanResults.businessInsights.map((item, index) => (
+                            <RecommendationCard key={`insight-${index}`} item={item} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 5. Marketing Suggestions */}
+                    {lastScanResults.marketingSuggestions && lastScanResults.marketingSuggestions.length > 0 && (
+                      <div>
+                        <h4 className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5 border-b border-purple-500/10 pb-1.5">
+                          <span>🎯 Marketing Suggestions</span>
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {lastScanResults.marketingSuggestions.map((item, index) => (
+                            <RecommendationCard key={`mkt-${index}`} item={item} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
