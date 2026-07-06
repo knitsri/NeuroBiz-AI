@@ -31,7 +31,7 @@ export default function VendorDashboard() {
   const handleAction = async (requestId, item, action) => {
     try {
       await handleVendorAction(requestId, action);
-      setActionAlert(`Order for ${item} has been ${action === 'accept' ? 'Approved & Shipped' : 'Rejected'}.`);
+      setActionAlert(`Order for ${item} has been ${action === 'accept' ? 'Accepted' : action === 'complete' ? 'Completed' : 'Rejected'}.`);
       setTimeout(() => setActionAlert(''), 4000);
     } catch (err) {
       console.error(err);
@@ -43,7 +43,9 @@ export default function VendorDashboard() {
   // Metrics
   const pendingRequests = procurementRequests.filter(r => r.status === 'Pending');
   const pendingCount = pendingRequests.length;
-  const approvedCount = procurementRequests.filter(r => r.status === 'Approved').length;
+  const activeContracts = procurementRequests.filter(r => r.status === 'Accepted');
+  const activeCount = activeContracts.length;
+  const approvedCount = procurementRequests.filter(r => r.status === 'Completed').length;
   const rejectedCount = procurementRequests.filter(r => r.status === 'Rejected').length;
   const totalRequestsCount = procurementRequests.length;
 
@@ -125,13 +127,13 @@ export default function VendorDashboard() {
       {/* Main Grid content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left Col: Pending Shipment Alerts */}
+        {/* Left Col: Active Contracts */}
         <div className="lg:col-span-2 glass rounded-3xl p-6 border border-slate-800 flex flex-col justify-between min-h-[350px]">
           <div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-850 pb-3">
               <div className="flex items-center gap-2">
-                <Activity className="h-4.5 w-4.5 text-yellow-400" />
-                <h2 className="text-sm font-bold text-slate-200">Alert Center: Pending Contracts</h2>
+                <Activity className="h-4.5 w-4.5 text-emerald-400 animate-pulse" />
+                <h2 className="text-sm font-bold text-slate-200">Active Contracts</h2>
               </div>
               
               <button
@@ -143,7 +145,7 @@ export default function VendorDashboard() {
               </button>
             </div>
 
-            {/* Real-time Alert inside Alert Center */}
+            {/* Real-time Alert inside Active Contracts */}
             {actionAlert && (
               <div className="mb-4 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold animate-in fade-in duration-305 flex items-center justify-between">
                 <span>{actionAlert}</span>
@@ -151,15 +153,15 @@ export default function VendorDashboard() {
               </div>
             )}
 
-            {pendingCount === 0 ? (
+            {activeCount === 0 ? (
               <div className="py-16 text-center flex flex-col items-center justify-center">
                 <FileCheck2 className="h-10 w-10 text-slate-700 mb-2" />
-                <p className="text-xs font-bold text-slate-400">All inbound shipments processed.</p>
-                <p className="text-[10px] text-slate-500 mt-1">SME owners have no active pending requests right now.</p>
+                <p className="text-xs font-bold text-slate-400">No active contracts.</p>
+                <p className="text-[10px] text-slate-500 mt-1">Contracts will appear here once you accept orders on the requests board.</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {pendingRequests.slice(0, 3).map((req) => (
+                {activeContracts.slice(0, 5).map((req) => (
                   <div 
                     key={req.id}
                     className="p-4 rounded-xl bg-slate-900/60 border border-slate-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
@@ -167,33 +169,26 @@ export default function VendorDashboard() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-200">{req.item}</span>
-                        <span className="px-2 py-0.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-black uppercase text-yellow-400">
+                        <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-black uppercase text-emerald-400">
                           {req.quantity} Units
                         </span>
                       </div>
                       <p className="text-[10px] text-slate-500 mt-1">Requested by: <strong className="text-slate-450">{req.businessName}</strong></p>
                     </div>
- 
+
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleAction(req.id, req.item, 'reject')}
-                        className="px-2.5 py-1.5 rounded-lg border border-rose-500/20 text-rose-455 hover:bg-rose-500/10 text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        <span>Reject</span>
-                      </button>
-                      <button
-                        onClick={() => handleAction(req.id, req.item, 'accept')}
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-md shadow-emerald-600/10"
+                        onClick={() => handleAction(req.id, req.item, 'complete')}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-md shadow-emerald-600/10"
                       >
                         <Check className="h-3.5 w-3.5" />
-                        <span>Approve</span>
+                        <span>Mark as Done</span>
                       </button>
                     </div>
                   </div>
                 ))}
-                {pendingCount > 3 && (
-                  <p className="text-[10px] text-slate-500 text-center font-bold">And {pendingCount - 3} more orders awaiting review...</p>
+                {activeCount > 5 && (
+                  <p className="text-[10px] text-slate-500 text-center font-bold">And {activeCount - 5} more active contracts...</p>
                 )}
               </div>
             )}

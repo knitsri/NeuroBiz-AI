@@ -16,7 +16,6 @@ export default function VendorRequests() {
   const [actionAlert, setActionAlert] = useState('');
 
   const pendingRequests = procurementRequests.filter(r => r.status === 'Pending');
-  const pastRequests = procurementRequests.filter(r => r.status !== 'Pending');
 
   const handleAction = (requestId, item, action) => {
     handleVendorAction(requestId, action);
@@ -99,58 +98,7 @@ export default function VendorRequests() {
         )}
       </div>
 
-      {/* Section 2: Fulfilled & Rejected Requests Board */}
-      <div>
-        <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-1.5">
-          <FileText className="h-4 w-4" /> Operations Logs: Past Contracts
-        </h3>
-
-        <div className="glass rounded-2xl border border-slate-805 overflow-hidden">
-          {pastRequests.length === 0 ? (
-            <div className="py-12 flex flex-col items-center justify-center text-center">
-              <Inbox className="h-10 w-10 text-slate-700 mb-2" />
-              <p className="text-xs font-bold text-slate-450">No operational records.</p>
-              <p className="text-[10px] text-slate-505 mt-1">Contracts will register here once you accept or reject inbound requests.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto w-full">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-850 bg-slate-900/40 text-[10px] font-extrabold text-slate-450 uppercase tracking-wider">
-                    <th className="py-4 px-6">Order ID</th>
-                    <th className="py-4 px-6">SKU Requested</th>
-                    <th className="py-4 px-6">Quantity</th>
-                    <th className="py-4 px-6">Purchasing SME</th>
-                    <th className="py-4 px-6">Date Processed</th>
-                    <th className="py-4 px-6">Lifecycle Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-850/60 text-xs font-semibold text-slate-350">
-                  {pastRequests.map((req) => (
-                    <tr key={req.id} className="hover:bg-slate-900/30 transition-colors">
-                      <td className="py-4 px-6 font-mono text-[10px] text-slate-500">{req.id.toUpperCase()}</td>
-                      <td className="py-4 px-6 font-bold text-slate-200">{req.item}</td>
-                      <td className="py-4 px-6">{req.quantity} Units</td>
-                      <td className="py-4 px-6 text-slate-400">{req.businessName}</td>
-                      <td className="py-4 px-6 text-slate-500">{req.date}</td>
-                      <td className="py-4 px-6">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border flex items-center gap-1 w-fit ${
-                          req.status === 'Approved'
-                            ? 'bg-emerald-500/10 text-emerald-450 border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-450 border-rose-500/20'
-                        }`}>
-                          {req.status === 'Approved' ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                          <span>{req.status === 'Approved' ? 'Fulfilled & Shipped' : 'Rejected'}</span>
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Operations Logs have been moved to the Dashboard Contracts section according to lifecycle rules. */}
     </div>
   );
 }

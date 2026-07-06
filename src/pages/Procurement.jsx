@@ -100,6 +100,8 @@ export default function Procurement() {
     }
   };
 
+  const pastOwnerRequests = procurementRequests.filter(r => r.status !== 'Pending');
+
   return (
     <div className="pt-20 pl-72 pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6">
       
@@ -364,7 +366,7 @@ export default function Procurement() {
         </h3>
 
         <div className="glass rounded-2xl border border-slate-805 overflow-hidden">
-          {procurementRequests.length === 0 ? (
+          {pastOwnerRequests.length === 0 ? (
             <div className="py-16 flex flex-col items-center justify-center text-center">
               <Clock className="h-10 w-10 text-slate-700 mb-3" />
               <p className="text-sm font-bold text-slate-450">No active procurement history.</p>
@@ -384,7 +386,7 @@ export default function Procurement() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-850/60 text-xs font-semibold text-slate-350">
-                  {procurementRequests.map((req) => (
+                  {pastOwnerRequests.map((req) => (
                     <tr key={req.id} className="hover:bg-slate-900/30 transition-colors">
                       <td className="py-4 px-6 font-mono text-[10px] text-slate-500">{req.id.toUpperCase()}</td>
                       <td className="py-4 px-6 font-bold text-slate-200">{req.item}</td>
@@ -393,16 +395,17 @@ export default function Procurement() {
                       <td className="py-4 px-6 text-slate-500">{req.date}</td>
                       <td className="py-4 px-6">
                         <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border flex items-center gap-1 w-fit ${
-                          req.status === 'Approved'
+                          req.status === 'Approved' || req.status === 'Accepted'
                             ? 'bg-emerald-500/10 text-emerald-450 border-emerald-500/20'
-                            : req.status === 'Rejected'
-                            ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
-                            : 'bg-yellow-500/10 text-yellow-455 border-yellow-500/20'
+                            : 'bg-rose-500/10 text-rose-455 border-rose-500/20'
                         }`}>
-                          {req.status === 'Approved' && <CheckCircle2 className="h-3 w-3" />}
+                          {(req.status === 'Approved' || req.status === 'Accepted') && <CheckCircle2 className="h-3 w-3" />}
                           {req.status === 'Rejected' && <XCircle className="h-3 w-3" />}
-                          {req.status === 'Pending' && <Clock className="h-3 w-3 animate-pulse" />}
-                          <span>{req.status}</span>
+                          <span>
+                            {req.status === 'Accepted' ? 'Accepted' :
+                             req.status === 'Approved' ? 'Fulfilled & Shipped' :
+                             req.status}
+                          </span>
                         </span>
                       </td>
                     </tr>

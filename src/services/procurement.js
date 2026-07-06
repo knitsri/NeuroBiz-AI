@@ -97,26 +97,44 @@ export async function handleVendorAction(requestId, action, ownerUid) {
       throw new Error('Unauthorized role.');
     }
 
-    const newStatus = action === 'accept' ? 'Approved' : 'Rejected';
+    const newStatus = action === 'accept' ? 'Accepted' : action === 'complete' ? 'Completed' : 'Rejected';
 
     // Update status in Firestore immediately
     await updateDoc(requestDocRef, { status: newStatus });
 
     // Notify Owner of vendor response
-    await addNotification(
-      requestData.ownerUid,
-      action === 'accept' ? 'Procurement Approved' : 'Procurement Rejected',
-      `Vendor ${requestData.vendor} has ${action === 'accept' ? 'accepted and shipped' : 'rejected'} order of ${requestData.item}.`,
-      action === 'accept' ? 'success' : 'warning'
-    );
+    if (action === 'complete') {
+      await addNotification(
+        requestData.ownerUid,
+        'Procurement Fulfilled',
+        `Vendor ${requestData.vendor} has fulfilled and completed your order of ${requestData.item}.`,
+        'success'
+      );
+    } else {
+      await addNotification(
+        requestData.ownerUid,
+        action === 'accept' ? 'Procurement Accepted' : 'Procurement Rejected',
+        `Vendor ${requestData.vendor} has ${action === 'accept' ? 'accepted' : 'rejected'} order of ${requestData.item}.`,
+        action === 'accept' ? 'success' : 'warning'
+      );
+    }
 
     // Notify Vendor of the action taken
-    await addNotification(
-      ownerUid,
-      action === 'accept' ? 'Order Approved & Shipped' : 'Order Rejected',
-      `You have ${action === 'accept' ? 'approved and shipped' : 'rejected'} the order of ${requestData.item} (${requestData.quantity} units) to ${requestData.businessName}.`,
-      action === 'accept' ? 'success' : 'warning'
-    );
+    if (action === 'complete') {
+      await addNotification(
+        ownerUid,
+        'Order Completed',
+        `You have marked the order of ${requestData.item} (${requestData.quantity} units) to ${requestData.businessName} as completed.`,
+        'success'
+      );
+    } else {
+      await addNotification(
+        ownerUid,
+        action === 'accept' ? 'Order Accepted' : 'Order Rejected',
+        `You have ${action === 'accept' ? 'accepted' : 'rejected'} the order of ${requestData.item} (${requestData.quantity} units) to ${requestData.businessName}.`,
+        action === 'accept' ? 'success' : 'warning'
+      );
+    }
 
     // If accepted, update the inventory stock levels for the owner in Firestore!
     if (action === 'accept') {
