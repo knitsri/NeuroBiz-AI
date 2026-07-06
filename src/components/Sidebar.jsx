@@ -86,10 +86,10 @@ export default function Sidebar() {
       <div className="p-4 border-t border-slate-800/80">
         <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/40 border border-slate-800/50 mb-3">
           <div className="h-9 w-9 rounded-lg bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center font-bold text-white shadow-md">
-            {currentUser.name.charAt(0)}
+            {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-slate-200 truncate">{currentUser.name}</p>
+            <p className="text-xs font-semibold text-slate-200 truncate">{currentUser.name || currentUser.email || 'User'}</p>
             <p className="text-[10px] text-slate-500 font-medium capitalize truncate">
               {activeRole} • {currentUser.businessType}
             </p>

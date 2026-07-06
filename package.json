@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"node server.js\" \"vite\"",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -12,6 +12,10 @@
   "dependencies": {
     "@google/genai": "^2.10.0",
     "@tailwindcss/vite": "^4.3.2",
+    "concurrently": "^10.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "firebase": "^12.15.0",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.23.0",
