@@ -16,7 +16,8 @@ export default function Header() {
     currentUser,
     activeRole,
     notifications,
-    markNotificationsAsRead
+    markNotificationsAsRead,
+    setIsAvatarModalOpen
   } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
@@ -180,12 +181,23 @@ export default function Header() {
         {/* Profile Info */}
         <div 
           onClick={() => navigate(activeRole === 'vendor' ? '/vendor/profile' : '/owner/profile')}
-          className="flex items-center gap-3 pl-2 cursor-pointer hover:opacity-80 transition-opacity"
+          className="flex items-center gap-3 pl-2 cursor-pointer group"
         >
-          <div className="h-8 w-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400">
-            {(currentUser?.name || currentUser?.email || 'U').charAt(0).toUpperCase()}
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsAvatarModalOpen(true);
+            }}
+            className="h-8 w-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400 overflow-hidden cursor-pointer hover:border-indigo-400 transition-colors shrink-0"
+            title="Change Profile Picture"
+          >
+            {currentUser?.avatarUrl ? (
+              <img src={currentUser.avatarUrl} className="h-full w-full object-cover" alt="Avatar" />
+            ) : (
+              (currentUser?.name || currentUser?.email || 'U').charAt(0).toUpperCase()
+            )}
           </div>
-          <div className="hidden lg:block text-left">
+          <div className="hidden lg:block text-left hover:opacity-80 transition-opacity">
             <p className="text-xs font-semibold text-slate-200 leading-3">{currentUser?.name || currentUser?.email || 'User'}</p>
             <p className="text-[10px] font-medium text-slate-500 capitalize">{currentUser?.businessName || 'Business'}</p>
           </div>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, getDocs, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { getUserProfile, logoutUser } from '../services/auth';
 import {
@@ -602,6 +602,16 @@ export const AppProvider = ({ children }) => {
     await logoutUser();
   };
 
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+
+  const updateProfileAvatar = async (avatarUrl) => {
+    if (currentUser) {
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, { avatarUrl });
+      setCurrentUser(prev => ({ ...prev, avatarUrl }));
+    }
+  };
+
   // Derived Dashboard Metrics directly from Firestore state synchronizers
   const totalItemsCount = inventory.length;
   const pendingRequestsCount = procurementRequests.filter(r => r.status === 'Pending').length;
@@ -644,7 +654,10 @@ export const AppProvider = ({ children }) => {
       generateAiCampaign,
       runAiScan,
       addSupplier,
-      logout
+      logout,
+      isAvatarModalOpen,
+      setIsAvatarModalOpen,
+      updateProfileAvatar
     }}>
       {children}
     </AppContext.Provider>

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export default function Profile() {
-  const { currentUser, initializeBusiness, activeRole } = useApp();
+  const { currentUser, initializeBusiness, activeRole, setIsAvatarModalOpen } = useApp();
 
   const [name, setName] = useState(currentUser?.name || '');
   const [bizName, setBizName] = useState(currentUser?.businessName || '');
@@ -59,8 +59,19 @@ export default function Profile() {
         <div className="absolute top-[-10%] right-[-10%] w-60 h-60 bg-indigo-500/5 rounded-full blur-[80px] pointer-events-none"></div>
 
         <div className="flex items-center gap-4 border-b border-slate-850 pb-6 mb-6">
-          <div className="h-16 w-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center font-extrabold text-indigo-400 text-2xl shadow-lg shadow-indigo-500/5">
-            {name.charAt(0)}
+          <div 
+            onClick={() => setIsAvatarModalOpen(true)}
+            className="h-16 w-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center font-extrabold text-indigo-400 text-2xl shadow-lg shadow-indigo-500/5 overflow-hidden cursor-pointer hover:border-indigo-400 transition-all duration-300 relative group shrink-0"
+            title="Click to Change Avatar"
+          >
+            {currentUser?.avatarUrl ? (
+              <img src={currentUser.avatarUrl} className="h-full w-full object-cover" alt="Avatar" />
+            ) : (
+              (currentUser?.name || currentUser?.email || 'U').charAt(0).toUpperCase()
+            )}
+            <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <span className="text-[9px] font-black text-indigo-300 uppercase tracking-widest text-center px-1">Edit</span>
+            </div>
           </div>
           <div>
             <h3 className="font-bold text-base text-slate-200">{name}</h3>

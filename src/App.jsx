@@ -4,6 +4,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import AIAssistantPanel from './components/AIAssistantPanel';
+import AvatarModal from './components/AvatarModal';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
@@ -60,6 +61,7 @@ function LayoutWrapper({ children }) {
           {children}
         </main>
         <AIAssistantPanel />
+        <AvatarModal />
       </div>
     </div>
   );

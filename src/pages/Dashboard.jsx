@@ -143,6 +143,121 @@ function RecommendationCard({ item }) {
   );
 }
 
+function DashboardStatCard({ title, value, icon: Icon, color, bgText }) {
+  const [isClicked, setIsClicked] = useState(false);
+  const [pulse, setPulse] = useState(false);
+  const [ripples, setRipples] = useState([]);
+
+  // Trigger brief pulse/count anim on number
+  const handleClick = (e) => {
+    setIsClicked(true);
+    setPulse(true);
+    setTimeout(() => setIsClicked(false), 150);
+    setTimeout(() => setPulse(false), 500);
+
+    // Ripple effect coords
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const newRipple = { id: Date.now(), x, y };
+    setRipples(prev => [...prev, newRipple]);
+    setTimeout(() => {
+      setRipples(prev => prev.filter(r => r.id !== newRipple.id));
+    }, 800);
+  };
+
+  const themeColors = {
+    indigo: {
+      border: 'hover:border-indigo-500/40',
+      glow: 'shadow-indigo-500/10 hover:shadow-indigo-500/20',
+      iconBg: 'bg-indigo-500/10 text-indigo-400',
+      text: 'text-indigo-500',
+    },
+    yellow: {
+      border: 'hover:border-yellow-500/40',
+      glow: 'shadow-yellow-500/10 hover:shadow-yellow-500/20',
+      iconBg: 'bg-yellow-500/10 text-yellow-400',
+      text: 'text-yellow-500',
+    },
+    emerald: {
+      border: 'hover:border-emerald-500/40',
+      glow: 'shadow-emerald-500/10 hover:shadow-emerald-500/20',
+      iconBg: 'bg-emerald-500/10 text-emerald-400',
+      text: 'text-emerald-500',
+    },
+    purple: {
+      border: 'hover:border-purple-500/40',
+      glow: 'shadow-purple-500/10 hover:shadow-purple-500/20',
+      iconBg: 'bg-purple-500/10 text-purple-400',
+      text: 'text-purple-500',
+    }
+  };
+
+  const theme = themeColors[color] || themeColors.indigo;
+
+  return (
+    <motion.div
+      onClick={handleClick}
+      whileHover={{ 
+        y: -6,
+        scale: 1.01,
+      }}
+      animate={{ 
+        scale: isClicked ? 0.97 : 1,
+      }}
+      transition={{ 
+        type: 'spring', 
+        stiffness: 400, 
+        damping: 15 
+      }}
+      className={`glass p-6 md:p-7 rounded-2xl border border-slate-800 flex items-center gap-4 relative overflow-hidden cursor-pointer select-none transition-all duration-300 ${theme.border} ${theme.glow} shadow-lg`}
+    >
+      {/* Moving slow gradient glow overlay in background */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-800/10 to-transparent translate-x-[-100%] animate-idle-glow pointer-events-none" />
+
+      {/* Ripple render */}
+      {ripples.map(r => (
+        <span 
+          key={r.id} 
+          className="absolute rounded-full bg-indigo-500/15 pointer-events-none animate-ripple"
+          style={{
+            left: r.x - 30,
+            top: r.y - 30,
+            width: 60,
+            height: 60,
+          }}
+        />
+      ))}
+
+      {/* Icon */}
+      <motion.div 
+        animate={pulse ? { rotate: [0, -15, 15, 0], scale: [1, 1.15, 1] } : {}}
+        transition={{ duration: 0.4 }}
+        className={`p-3.5 rounded-xl shrink-0 ${theme.iconBg}`}
+      >
+        <Icon className="h-6.5 w-6.5" />
+      </motion.div>
+
+      {/* Content */}
+      <div className="z-10">
+        <p className="text-[10.5px] font-bold text-slate-400 tracking-wider uppercase">{title}</p>
+        <motion.h3 
+          animate={pulse ? { scale: [1, 1.2, 1], color: ['#f3f4f6', '#818cf8', '#f3f4f6'] } : {}}
+          transition={{ duration: 0.3 }}
+          className="text-3xl font-black text-slate-100 mt-1"
+        >
+          {value}
+        </motion.h3>
+      </div>
+
+      {/* Background large lettering decoration */}
+      <div className={`absolute right-0 bottom-[-15px] opacity-[0.03] ${theme.text} font-black text-7xl select-none`}>
+        {bgText}
+      </div>
+    </motion.div>
+  );
+}
+
 export default function Dashboard() {
   const {
     inventory,
@@ -247,62 +362,35 @@ export default function Dashboard() {
   return (
     <div className="pt-20 pl-72 pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6">
       {/* Top Grid: Operational Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Inventory Items */}
-        <div className="glass p-5 rounded-2xl border border-slate-800 flex items-center gap-4 relative overflow-hidden group hover:border-indigo-500/30 transition-all duration-300">
-          <div className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">
-            <Boxes className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Total Inventory Items</p>
-            <h3 className="text-2xl font-black text-slate-100 mt-1">{totalItemsCount}</h3>
-          </div>
-          <div className="absolute right-0 bottom-[-15px] opacity-5 text-indigo-500 font-extrabold text-7xl select-none group-hover:scale-110 transition-transform">
-            ITEMS
-          </div>
-        </div>
-
-        {/* Pending Requests */}
-        <div className="glass p-5 rounded-2xl border border-slate-800 flex items-center gap-4 relative overflow-hidden group hover:border-yellow-500/30 transition-all duration-300">
-          <div className="p-3 bg-yellow-500/10 text-yellow-400 rounded-xl">
-            <ShoppingCart className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Pending Requests</p>
-            <h3 className="text-2xl font-black text-slate-100 mt-1">{pendingRequestsCount}</h3>
-          </div>
-          <div className="absolute right-0 bottom-[-15px] opacity-5 text-yellow-500 font-extrabold text-7xl select-none group-hover:scale-110 transition-transform">
-            PROCUR
-          </div>
-        </div>
-
-        {/* Active Vendors */}
-        <div className="glass p-5 rounded-2xl border border-slate-800 flex items-center gap-4 relative overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
-          <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
-            <UserCheck className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Active Vendors</p>
-            <h3 className="text-2xl font-black text-slate-100 mt-1">{activeVendorsCount}</h3>
-          </div>
-          <div className="absolute right-0 bottom-[-15px] opacity-5 text-emerald-500 font-extrabold text-7xl select-none group-hover:scale-110 transition-transform">
-            VENDOR
-          </div>
-        </div>
-
-        {/* Running Campaigns */}
-        <div className="glass p-5 rounded-2xl border border-slate-800 flex items-center gap-4 relative overflow-hidden group hover:border-purple-500/30 transition-all duration-300">
-          <div className="p-3 bg-purple-500/10 text-purple-400 rounded-xl">
-            <Megaphone className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Active Marketing</p>
-            <h3 className="text-2xl font-black text-slate-100 mt-1">{marketingCampaignsCount}</h3>
-          </div>
-          <div className="absolute right-0 bottom-[-15px] opacity-5 text-purple-500 font-extrabold text-7xl select-none group-hover:scale-110 transition-transform">
-            MARKET
-          </div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <DashboardStatCard 
+          title="Total Inventory Items"
+          value={totalItemsCount}
+          icon={Boxes}
+          color="indigo"
+          bgText="ITEMS"
+        />
+        <DashboardStatCard 
+          title="Pending Requests"
+          value={pendingRequestsCount}
+          icon={ShoppingCart}
+          color="yellow"
+          bgText="PROCUR"
+        />
+        <DashboardStatCard 
+          title="Active Vendors"
+          value={activeVendorsCount}
+          icon={UserCheck}
+          color="emerald"
+          bgText="VENDOR"
+        />
+        <DashboardStatCard 
+          title="Active Marketing"
+          value={marketingCampaignsCount}
+          icon={Megaphone}
+          color="purple"
+          bgText="MARKET"
+        />
       </div>
 
       {/* Main Section layout: 2 columns (AI Health Check & Explainable AI Card) */}
