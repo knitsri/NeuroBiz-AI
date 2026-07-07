@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
   Bell,
@@ -19,6 +19,7 @@ export default function Header() {
     markNotificationsAsRead
   } = useApp();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Clock state
   const [timeStr, setTimeStr] = useState('');
@@ -177,7 +178,10 @@ export default function Header() {
         </div>
 
         {/* Profile Info */}
-        <div className="flex items-center gap-3 pl-2">
+        <div 
+          onClick={() => navigate(activeRole === 'vendor' ? '/vendor/profile' : '/owner/profile')}
+          className="flex items-center gap-3 pl-2 cursor-pointer hover:opacity-80 transition-opacity"
+        >
           <div className="h-8 w-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400">
             {(currentUser?.name || currentUser?.email || 'U').charAt(0).toUpperCase()}
           </div>
