@@ -40,13 +40,13 @@ const getLocalFallbackCampaign = (product, offer, discount) => {
     description
   };
 };
-import { 
-  Megaphone, 
-  Sparkles, 
-  Camera, 
-  MessageSquare, 
-  Copy, 
-  Check, 
+import {
+  Megaphone,
+  Sparkles,
+  Camera,
+  MessageSquare,
+  Copy,
+  Check,
   TrendingUp,
   RefreshCw,
   Download,
@@ -100,11 +100,11 @@ export default function Marketing() {
       ];
     }
   };
-  
+
   // Load states
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRegeneratingPoster, setIsRegeneratingPoster] = useState(false);
-  
+
   const [currentAsset, setCurrentAsset] = useState(null);
 
   // Synchronize initial selection & restore saved workspace state (owner-scoped)
@@ -157,7 +157,7 @@ export default function Marketing() {
     }
     setActiveMarketing(0);
   };
-  
+
   // Feedback states
   const [copiedType, setCopiedType] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -302,7 +302,7 @@ export default function Marketing() {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
-    
+
     try {
       // 1. Call async campaign generator in AppContext
       let aiCampaign;
@@ -319,9 +319,10 @@ export default function Marketing() {
           throw geminiError;
         }
       }
-      
+
       // 2. Call backend image generator endpoint
-      const response = await fetch('/api/generate-image', {
+      const API_URL = import.meta.env.VITE_API_URL;
+      const response = await fetch(`${API_URL}/api/generate-image`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -380,7 +381,7 @@ export default function Marketing() {
         localStorage.setItem(`neurobiz_marketing_workspace_${currentUser.uid}`, JSON.stringify(assetData));
       }
       setActiveMarketing(1);
-      
+
       if (showFallbackWarning) {
         setToastType('error');
         setToastMsg('AI text quota reached. Fallback marketing copy generated.');
@@ -410,7 +411,7 @@ export default function Marketing() {
 
   const handleRegenerateItem = async () => {
     if (!currentAsset || isRegeneratingPoster) return;
-    
+
     setIsRegeneratingPoster(true);
     setToastType('success');
 
@@ -419,7 +420,7 @@ export default function Marketing() {
 
     try {
       const offsetDiscount = Math.min(Number(discount) + (Math.random() > 0.5 ? 5 : -5), 75);
-      
+
       let aiCampaign;
       let showFallbackWarning = false;
       try {
@@ -434,7 +435,7 @@ export default function Marketing() {
           throw geminiError;
         }
       }
-      
+
       // Call backend image generator endpoint
       const response = await fetch('/api/generate-image', {
         method: 'POST',
@@ -479,7 +480,7 @@ export default function Marketing() {
       }
 
       const data = await response.json();
-      
+
       const assetData = {
         ...aiCampaign,
         instagram: aiCampaign.instagramCaption || aiCampaign.instagram || '',
@@ -494,7 +495,7 @@ export default function Marketing() {
         localStorage.setItem(`neurobiz_marketing_workspace_${currentUser.uid}`, JSON.stringify(assetData));
       }
       setActiveMarketing(1);
-      
+
       if (showFallbackWarning) {
         setToastType('error');
         setToastMsg('AI text quota reached. Fallback marketing copy generated.');
@@ -525,7 +526,7 @@ export default function Marketing() {
   const copyToClipboard = (text, type) => {
     navigator.clipboard.writeText(text);
     setCopiedType(type);
-    
+
     setToastMsg(`Copied ${type === 'instagram' ? 'Instagram Caption' : 'WhatsApp Message'} to Clipboard!`);
     setShowToast(true);
     setTimeout(() => {
@@ -626,7 +627,7 @@ export default function Marketing() {
       ctx.font = '900 24px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('SHOP NOW', canvas.width / 2, 860);
-      
+
       ctx.font = 'bold 12px sans-serif';
       ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
       ctx.fillText('Scan QR Code or visit neurobiz.ai to redeem', canvas.width / 2, 890);
@@ -661,14 +662,13 @@ export default function Marketing() {
 
   return (
     <div className="pt-20 pl-72 pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6 relative">
-      
+
       {/* Toast popup */}
       {showToast && (
-        <div className={`fixed top-20 right-8 z-50 p-4 rounded-xl border text-xs font-bold animate-in slide-in-from-top-4 duration-300 flex items-center gap-2 shadow-xl ${
-          toastType === 'error' 
-            ? 'bg-rose-500/10 border-rose-500/30 text-rose-450 shadow-rose-950/20' 
-            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-450 text-xs font-bold shadow-emerald-950/20'
-        }`}>
+        <div className={`fixed top-20 right-8 z-50 p-4 rounded-xl border text-xs font-bold animate-in slide-in-from-top-4 duration-300 flex items-center gap-2 shadow-xl ${toastType === 'error'
+          ? 'bg-rose-500/10 border-rose-500/30 text-rose-450 shadow-rose-950/20'
+          : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-450 text-xs font-bold shadow-emerald-950/20'
+          }`}>
           {toastType === 'error' ? (
             <AlertCircle className="h-4.5 w-4.5 text-rose-400 font-semibold" />
           ) : (
@@ -685,7 +685,7 @@ export default function Marketing() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Left Column: Directives Input Form */}
         <div className="lg:col-span-1 glass rounded-3xl p-6 border border-slate-800 h-fit">
           <h3 className="text-sm font-bold text-slate-200 mb-4 flex items-center gap-1.5">
@@ -785,7 +785,7 @@ export default function Marketing() {
 
         {/* Right Column: Unified Stacked Workspace Output (AI Marketing Kit) */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          
+
           {/* Main workspace container */}
           {isGenerating ? (
             /* Loader */
@@ -804,7 +804,7 @@ export default function Marketing() {
           ) : (
             /* Exposed Stacked Workspace Feed - AI Marketing Kit */
             <div className="space-y-6 animate-in fade-in duration-300">
-              
+
               {/* 1. MARKETING POSTER (Primary Hero Focus) */}
               <div className="glass rounded-3xl p-6 border border-slate-800 flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-slate-850 pb-3">
@@ -826,12 +826,12 @@ export default function Marketing() {
                   <div className="flex flex-col items-center gap-4">
                     {/* Real preview matches download exactly */}
                     <div className="relative rounded-2xl overflow-hidden border border-slate-850/80 bg-slate-950 w-full max-w-[420px] shadow-2xl aspect-[4/5] flex items-center justify-center">
-                      <img 
-                        src={currentAsset.posterUrl} 
-                        alt="NeuroBiz AI generated Poster preview" 
-                        className="absolute inset-0 w-full h-full object-cover" 
+                      <img
+                        src={currentAsset.posterUrl}
+                        alt="NeuroBiz AI generated Poster preview"
+                        className="absolute inset-0 w-full h-full object-cover"
                       />
-                      
+
                       {/* Premium UI Overlay */}
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-slate-950/45 p-6 flex flex-col justify-between text-left pointer-events-none select-none">
                         {/* Top Section */}
@@ -840,13 +840,12 @@ export default function Marketing() {
                             <div className="text-xs font-black tracking-widest text-indigo-400 uppercase">NEUROBIZ AI</div>
                             <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">AUTOPILOT KIT</div>
                           </div>
-                          
+
                           {/* Circle Discount Badge */}
-                          <div className={`h-16 w-16 rounded-full flex flex-col items-center justify-center border-2 border-white/90 text-white font-extrabold shadow-lg ${
-                            businessType === 'restaurant' ? 'bg-emerald-500 shadow-emerald-500/25' :
+                          <div className={`h-16 w-16 rounded-full flex flex-col items-center justify-center border-2 border-white/90 text-white font-extrabold shadow-lg ${businessType === 'restaurant' ? 'bg-emerald-500 shadow-emerald-500/25' :
                             businessType === 'clothing' ? 'bg-pink-500 shadow-pink-500/25' :
-                            'bg-indigo-650 shadow-indigo-650/25'
-                          }`}>
+                              'bg-indigo-650 shadow-indigo-650/25'
+                            }`}>
                             <span className="text-lg leading-none">{currentAsset.discount || discount}%</span>
                             <span className="text-[7px] tracking-wider leading-none uppercase">OFF</span>
                           </div>
@@ -862,7 +861,7 @@ export default function Marketing() {
                               {currentAsset.product || selectedProduct}
                             </h3>
                           </div>
-                          
+
                           {/* CTA Overlay Card */}
                           <div className="py-2.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 text-center text-white font-black text-xs uppercase tracking-widest shadow-md">
                             SHOP NOW
@@ -908,7 +907,7 @@ export default function Marketing() {
                     <span>{copiedType === 'instagram' ? 'Copied' : 'Copy Caption'}</span>
                   </button>
                 </div>
-                
+
                 <div className="p-4 rounded-xl bg-slate-950/45 border border-slate-850 text-xs text-slate-350 leading-relaxed whitespace-pre-wrap select-all">
                   {currentAsset.instagram}
                 </div>
@@ -929,7 +928,7 @@ export default function Marketing() {
                     <span>{copiedType === 'whatsapp' ? 'Copied' : 'Copy WhatsApp Message'}</span>
                   </button>
                 </div>
-                
+
                 <div className="p-4 rounded-xl bg-slate-950/45 border border-slate-850 text-xs font-mono text-slate-350 leading-relaxed whitespace-pre-wrap select-all">
                   {currentAsset.whatsapp}
                 </div>

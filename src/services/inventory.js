@@ -105,7 +105,6 @@ export async function addInventoryItem(ownerUid, itemData) {
           ownerUid,
           createdAt: new Date().toISOString()
         });
-        console.log(`New vendor ${item.vendor} automatically created upon item addition.`);
       }
     }
 
@@ -154,7 +153,6 @@ export async function updateInventoryItem(ownerUid, itemId, itemData) {
                 ownerUid,
                 createdAt: new Date().toISOString()
               });
-              console.log(`New vendor ${newVendor} automatically created on update.`);
             }
           }
 
@@ -171,7 +169,6 @@ export async function updateInventoryItem(ownerUid, itemId, itemData) {
               for (const docD of oldVendorSnap.docs) {
                 await deleteDoc(doc(db, 'vendors', docD.id));
               }
-              console.log(`Unused old vendor ${oldVendor} removed from vendors collection.`);
             }
           }
         }
@@ -227,7 +224,6 @@ export async function deleteInventoryItem(ownerUid, itemId, itemName) {
         for (const docD of vendorSnap.docs) {
           await deleteDoc(doc(db, 'vendors', docD.id));
         }
-        console.log(`Unreferenced vendor ${vendorName} removed from vendors collection.`);
       }
     }
 

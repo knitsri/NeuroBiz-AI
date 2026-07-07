@@ -125,16 +125,9 @@ CRITICAL: Do NOT include any text, product names, slogans, numbers, discount per
 
         const status = response.status;
         const willRetry = retryCodes.includes(status) && attempt < maxRetries;
-        
-        console.log(`Cloudflare AI Response:
-  - Model: ${model}
-  - HTTP Status: ${status}
-  - Attempt: ${attempt} (max: ${maxRetries})
-  - Will Retry: ${willRetry}`);
 
         if (response.ok) {
           const contentType = response.headers.get('content-type') || '';
-          console.log(`Cloudflare AI Response OK. Content-Type: ${contentType}`);
           
           if (contentType.includes('application/json')) {
             const jsonResponse = await response.json();
@@ -142,14 +135,11 @@ CRITICAL: Do NOT include any text, product names, slogans, numbers, discount per
             if (!base64Image) {
               throw new Error("No image data found in Cloudflare JSON response result.");
             }
-            console.log("CLOUDFLARE_IMAGE_GENERATION_SUCCESS");
-            console.log(`Cloudflare AI response shape keys: ${Object.keys(jsonResponse)}`);
             imageBuffer = Buffer.from(base64Image, 'base64');
           } else {
             // Fallback for binary image bytes
             const arrayBuffer = await response.arrayBuffer();
             imageBuffer = Buffer.from(arrayBuffer);
-            console.log("CLOUDFLARE_IMAGE_GENERATION_SUCCESS (binary)");
           }
 
           if (!imageBuffer || imageBuffer.byteLength === 0) {
@@ -185,11 +175,6 @@ CRITICAL: Do NOT include any text, product names, slogans, numbers, discount per
 
       } catch (err) {
         const willRetry = attempt < maxRetries;
-        console.log(`Cloudflare AI Response (Network Error):
-  - Model: ${model}
-  - HTTP Status: Network Error (${err.message})
-  - Attempt: ${attempt} (max: ${maxRetries})
-  - Will Retry: ${willRetry}`);
 
         // Retry network failures
         if (willRetry) {

@@ -379,15 +379,10 @@ export const AppProvider = ({ children }) => {
 
     try {
       // Fetch Firestore data
-      console.log("========== CURRENT USER ==========");
-      console.log(currentUser);
-      console.log("Current UID:", currentUser.uid);
       const invQuery = query(collection(db, 'inventory'), where('ownerUid', '==', currentUser.uid));
       const invSnap = await getDocs(invQuery);
       const dbInventory = [];
       invSnap.forEach(d => dbInventory.push({ id: d.id, ...d.data() }));
-      console.log("========== INVENTORY FROM FIRESTORE ==========");
-      console.table(dbInventory);
 
       const procQuery = query(collection(db, 'procurements'), where('ownerUid', '==', currentUser.uid));
       const procSnap = await getDocs(procQuery);
@@ -423,8 +418,6 @@ export const AppProvider = ({ children }) => {
       if (!force && lastScanResults &&
         lastScanResults.inventoryHash === currentInventoryHash &&
         lastScanResults.procurementHash === currentProcurementHash) {
-        console.log("Cached scan match detected. Re-using cached AI Health scan.");
-
         // Update time of scan execution for presentation
         const cachedResults = {
           ...lastScanResults,
@@ -528,13 +521,6 @@ export const AppProvider = ({ children }) => {
           marketingScore
         }
       };
-
-      console.log("========== BUSINESS CONTEXT SENT TO GEMINI ==========");
-      console.log(businessContext);
-      console.table(cleanInventory);
-      console.table(cleanVendors);
-      console.table(cleanProcurements);
-      console.table(cleanMarketing);
 
       // Call Gemini 2.5 Flash Health Scanner
       const { runGeminiHealthScan } = await import('../services/gemini');
