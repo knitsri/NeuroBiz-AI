@@ -11,17 +11,30 @@ import {
 } from 'lucide-react';
 
 export default function AIAssistantPanel() {
-  const { askAiAssistant, currentUser, businessType } = useApp();
+  const { askAiAssistant, currentUser, businessType, activeRole } = useApp();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [isAiResponding, setIsAiResponding] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    { 
-      sender: 'ai', 
-      text: "Hello! I am your NeuroBiz Business Copilot. Ask me about inventory burn-rates, pending vendor orders, seasonal reorders, or today's operational summary." 
+  const [chatMessages, setChatMessages] = useState([]);
+
+  useEffect(() => {
+    if (activeRole === 'vendor') {
+      setChatMessages([
+        {
+          sender: 'ai',
+          text: "Hello! I am your NeuroBiz Vendor Copilot. I can help you manage procurement requests, active contracts, shipment status, and SME order fulfillment."
+        }
+      ]);
+    } else {
+      setChatMessages([
+        {
+          sender: 'ai',
+          text: "Hello! I am your NeuroBiz Business Copilot. Ask me about inventory burn-rates, pending vendor orders, seasonal reorders, or today's operational summary."
+        }
+      ]);
     }
-  ]);
+  }, [activeRole]);
   
   const messagesEndRef = useRef(null);
 
@@ -56,7 +69,13 @@ export default function AIAssistantPanel() {
     }
   };
 
-  const presetQuestions = [
+  const presetQuestions = activeRole === 'vendor' ? [
+    'Show pending procurement requests',
+    'Which contracts need fulfillment?',
+    "Show today's deliveries",
+    'Which SMEs am I serving?',
+    "Summarize today's vendor operations"
+  ] : [
     'Which products are running low?',
     'Which vendor has pending requests?',
     'What should I reorder?',

@@ -97,7 +97,7 @@ export async function handleVendorAction(requestId, action, ownerUid) {
       throw new Error('Unauthorized role.');
     }
 
-    const newStatus = action === 'accept' ? 'Accepted' : action === 'complete' ? 'Completed' : 'Rejected';
+    const newStatus = action === 'accept' ? 'Accepted' : action === 'complete' ? 'Fulfilled & Shipped' : 'Rejected';
 
     // Update status in Firestore immediately
     await updateDoc(requestDocRef, { status: newStatus });
@@ -106,8 +106,8 @@ export async function handleVendorAction(requestId, action, ownerUid) {
     if (action === 'complete') {
       await addNotification(
         requestData.ownerUid,
-        'Procurement Fulfilled',
-        `Vendor ${requestData.vendor} has fulfilled and completed your order of ${requestData.item}.`,
+        'Procurement Shipped',
+        `Vendor ${requestData.vendor} has marked order of ${requestData.item} as Fulfilled & Shipped.`,
         'success'
       );
     } else {
@@ -123,8 +123,8 @@ export async function handleVendorAction(requestId, action, ownerUid) {
     if (action === 'complete') {
       await addNotification(
         ownerUid,
-        'Order Completed',
-        `You have marked the order of ${requestData.item} (${requestData.quantity} units) to ${requestData.businessName} as completed.`,
+        'Order Shipped',
+        `You have marked the order of ${requestData.item} (${requestData.quantity} units) to ${requestData.businessName} as Fulfilled & Shipped.`,
         'success'
       );
     } else {

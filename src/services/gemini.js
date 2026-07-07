@@ -133,7 +133,27 @@ If information is unavailable, explicitly respond:
 export async function askGeminiAssistant(businessData, question) {
   try {
     const ai = getAIClient();
-    const formattedPrompt = AI_ASSISTANT_PROMPT
+    
+    let systemPrompt = AI_ASSISTANT_PROMPT;
+    if (businessData.role === 'vendor') {
+      systemPrompt = `You are NeuroBiz AI.
+You are the supplier/vendor's intelligent B2B operations assistant.
+You help the vendor manage inbound restock requests, active shipping contracts, fulfillment tasks, and SME customer relationships.
+
+Answer ONLY using the supplied vendor business information.
+Never hallucinate or invent orders or metrics.
+If information is unavailable, clearly state that.
+
+Always provide concise, actionable B2B logistics and fulfillment advice.
+
+Business Data:
+{{BUSINESS_DATA}}
+
+Question:
+{{QUESTION}}`;
+    }
+
+    const formattedPrompt = systemPrompt
       .replace("{{BUSINESS_DATA}}", JSON.stringify(businessData, null, 2))
       .replace("{{QUESTION}}", question);
 

@@ -1,13 +1,13 @@
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  onSnapshot, 
-  query, 
-  where, 
-  getDocs 
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  where,
+  getDocs
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { addNotification } from './notifications';
@@ -21,15 +21,11 @@ const defaultInventoryByBusiness = {
     { name: 'Band-Aids', category: 'First Aid', stock: 0, minimumStock: 15, vendor: 'Apex Pharma', status: 'Out of Stock' }
   ],
   restaurant: [
-    { name: 'Chicken Biryani', category: 'Main Course', stock: 45, minimumStock: 15, vendor: 'Metro Food Services', status: 'In Stock' },
-    { name: 'Paneer Tikka', category: 'Starters', stock: 8, minimumStock: 12, vendor: 'GreenGrow Organics', status: 'Low Stock' },
-    { name: 'Butter Chicken', category: 'Main Course', stock: 30, minimumStock: 10, vendor: 'Metro Food Services', status: 'In Stock' },
-    { name: 'Veg Fried Rice', category: 'Main Course', stock: 22, minimumStock: 10, vendor: 'GreenGrow Organics', status: 'In Stock' },
-    { name: 'Margherita Pizza', category: 'Pizza', stock: 5, minimumStock: 10, vendor: 'Metro Food Services', status: 'Low Stock' },
-    { name: 'Chicken Burger', category: 'Burgers', stock: 0, minimumStock: 8, vendor: 'Metro Food Services', status: 'Out of Stock' },
-    { name: 'Pasta Alfredo', category: 'Pasta', stock: 18, minimumStock: 8, vendor: 'GreenGrow Organics', status: 'In Stock' },
-    { name: 'Chocolate Brownie', category: 'Desserts', stock: 3, minimumStock: 10, vendor: 'Sweet Treats Bakery', status: 'Low Stock' },
-    { name: 'Mango Mocktail', category: 'Beverages', stock: 40, minimumStock: 15, vendor: 'Fresh Juice Co.', status: 'In Stock' }
+    { name: 'Fresh Salmon', category: 'Seafood', stock: 3, minimumStock: 10, vendor: 'Ocean Fresh Seafood', status: 'Low Stock' },
+    { name: 'Olive Oil', category: 'Ingredients', stock: 15, minimumStock: 5, vendor: 'Metro Food Services', status: 'In Stock' },
+    { name: 'Tomatoes', category: 'Produce', stock: 5, minimumStock: 15, vendor: 'GreenGrow Organics', status: 'Low Stock' },
+    { name: 'Garlic', category: 'Produce', stock: 30, minimumStock: 10, vendor: 'GreenGrow Organics', status: 'In Stock' },
+    { name: 'Premium Rice', category: 'Grains', stock: 1, minimumStock: 5, vendor: 'Metro Food Services', status: 'Low Stock' }
   ],
   clothing: [
     { name: 'Denim Jackets', category: 'Outerwear', stock: 4, minimumStock: 10, vendor: 'TexStyle Apparel', status: 'Low Stock' },
@@ -56,7 +52,7 @@ export async function seedInventoryIfEmpty(ownerUid, businessType) {
           createdAt: new Date().toISOString()
         });
       }
-      
+
       // Seed default vendors for this owner
       const uniqueVendors = Array.from(new Set(defaults.map(d => d.vendor)));
       for (const vendorName of uniqueVendors) {

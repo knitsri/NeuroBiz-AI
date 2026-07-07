@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { 
-  ShoppingCart, 
-  Sparkles, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  TrendingUp, 
+import {
+  ShoppingCart,
+  Sparkles,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  TrendingUp,
   ArrowRight,
   ClipboardList,
   Building2,
@@ -18,32 +18,33 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
-const defaultProcurementRecs = {
-  pharmacy: [
-    { id: 'pr-p1', name: 'Paracetamol', currentStock: 12, recommendedStock: 150, vendor: 'PharmaDistribute Co.' },
-    { id: 'pr-p3', name: 'Ibuprofen', currentStock: 8, recommendedStock: 100, vendor: 'BioMed Supplies' },
-    { id: 'pr-p5', name: 'Band-Aids', currentStock: 0, recommendedStock: 200, vendor: 'Apex Pharma' }
-  ],
-  restaurant: [
-    { id: 'pr-r1', name: 'Fresh Salmon', currentStock: 3, recommendedStock: 25, vendor: 'Ocean Fresh Seafood' },
-    { id: 'pr-r3', name: 'Tomatoes', currentStock: 5, recommendedStock: 50, vendor: 'GreenGrow Organics' },
-    { id: 'pr-r5', name: 'Premium Rice', currentStock: 1, recommendedStock: 40, vendor: 'Metro Food Services' }
-  ],
-  clothing: [
-    { id: 'pr-c1', name: 'Denim Jackets', currentStock: 4, recommendedStock: 30, vendor: 'TexStyle Apparel' },
-    { id: 'pr-c3', name: 'Summer Dresses', currentStock: 2, recommendedStock: 50, vendor: 'Urban Wear Wholesalers' },
-    { id: 'pr-c5', name: 'Woolen Sweaters', currentStock: 0, recommendedStock: 40, vendor: 'TexStyle Apparel' }
-  ]
-};
-
 export default function Procurement() {
-  const { businessType, procurementRequests, approveRecommendation, vendorsList, inventory } = useApp();
+  const { businessType, procurementRequests, approveRecommendation, vendorsList, inventory, addSupplier } = useApp();
   const [successMessage, setSuccessMessage] = useState('');
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [orderQuantities, setOrderQuantities] = useState({});
   const [orderLoading, setOrderLoading] = useState({});
 
-  const recommendations = defaultProcurementRecs[businessType] || [];
+  // Modal registration states
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [supName, setSupName] = useState('');
+  const [supCategory, setSupCategory] = useState('');
+  const [supEmail, setSupEmail] = useState('');
+  const [supPhone, setSupPhone] = useState('');
+  const [supProducts, setSupProducts] = useState('');
+
+  const recommendations = inventory
+    .filter(item => item.stock <= item.minimumStock)
+    .map(item => ({
+      id: `rec-${item.id}`,
+      name: item.name,
+      currentStock: item.stock,
+      recommendedStock: Math.max(25, (item.minimumStock * 4) - item.stock),
+      vendor: item.vendor || 'A-1 Logistics'
+    }))
+    .filter(rec =>
+      !procurementRequests.some(r => r.item === rec.name && (r.status === 'Pending' || r.status === 'Accepted' || r.status === 'Fulfilled & Shipped'))
+    );
 
   // Filter vendors list to remove duplicate entries by name
   const uniqueVendors = [];
@@ -57,6 +58,32 @@ export default function Procurement() {
     }
   }
 
+  const handleAddSupplier = async (e) => {
+    e.preventDefault();
+    if (!supName || !supCategory || !supEmail) return;
+    try {
+      await addSupplier({
+        name: supName,
+        category: supCategory,
+        email: supEmail,
+        phone: supPhone,
+        products: supProducts
+      });
+      setSuccessMessage(`Supplier "${supName}" has been successfully registered.`);
+      setTimeout(() => setSuccessMessage(''), 4000);
+      setSupName('');
+      setSupCategory('');
+      setSupEmail('');
+      setSupPhone('');
+      setSupProducts('');
+      setIsAddModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      setSuccessMessage(`Failed to add supplier: ${err.message}`);
+      setTimeout(() => setSuccessMessage(''), 4000);
+    }
+  };
+
   const handleApprove = async (rec) => {
     const success = await approveRecommendation(rec);
     if (success) {
@@ -68,8 +95,33 @@ export default function Procurement() {
     }
   };
 
-  const getProductsForVendor = (vendorName) => {
-    return inventory.filter(item => item.vendor === vendorName);
+  const getProductsForVendor = (vendor) => {
+    if (!vendor) return [];
+    const invItems = inventory.filter(item => item.vendor === vendor.name);
+    const offeredNames = [];
+    if (vendor.products) {
+      if (Array.isArray(vendor.products)) {
+        offeredNames.push(...vendor.products);
+      } else if (typeof vendor.products === 'string') {
+        offeredNames.push(...vendor.products.split(',').map(p => p.trim()).filter(Boolean));
+      }
+    }
+    const combined = [...invItems];
+    offeredNames.forEach(name => {
+      const exists = combined.some(item => item.name.toLowerCase() === name.toLowerCase());
+      if (!exists) {
+        combined.push({
+          id: `offered-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+          name: name,
+          category: vendor.category || 'Supplies',
+          stock: 0,
+          minimumStock: 10,
+          vendor: vendor.name,
+          status: 'Out of Stock'
+        });
+      }
+    });
+    return combined;
   };
 
   const handlePlaceOrder = async (product, vendorName) => {
@@ -100,11 +152,11 @@ export default function Procurement() {
     }
   };
 
-  const pastOwnerRequests = procurementRequests.filter(r => r.status !== 'Pending');
+  const pastOwnerRequests = procurementRequests;
 
   return (
     <div className="pt-20 pl-72 pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6">
-      
+
       {/* Page Title */}
       <div>
         <h2 className="text-xl font-bold tracking-tight text-slate-200">Procurement Center</h2>
@@ -120,9 +172,17 @@ export default function Procurement() {
 
       {/* Section 1: Supplier Directory */}
       <div>
-        <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-1.5">
-          <Building2 className="h-4 w-4" /> Supplier Directory
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5 mb-0">
+            <Building2 className="h-4 w-4" /> Supplier Directory
+          </h3>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-8 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[13px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-md shadow-indigo-600/10"
+          >
+            <span>+ Add Supplier</span>
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Vendors List Column */}
@@ -133,7 +193,7 @@ export default function Procurement() {
                 <p className="text-xs text-slate-505 italic p-4 text-center">No suppliers found.</p>
               ) : (
                 uniqueVendors.map((vendor) => {
-                  const vendorProducts = getProductsForVendor(vendor.name);
+                  const vendorProducts = getProductsForVendor(vendor);
                   const isSelected = selectedVendor?.id === vendor.id;
                   const categories = Array.from(new Set(vendorProducts.map(p => p.category)));
 
@@ -141,11 +201,10 @@ export default function Procurement() {
                     <button
                       key={vendor.id}
                       onClick={() => setSelectedVendor(vendor)}
-                      className={`w-full text-left p-3.5 rounded-xl border transition-all duration-300 flex items-center justify-between cursor-pointer group ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-indigo-500/10 to-indigo-500/5 border-indigo-500 text-indigo-300'
-                          : 'bg-slate-900/40 border-slate-850 hover:border-slate-700 text-slate-400 hover:text-slate-200'
-                      }`}
+                      className={`w-full text-left p-3.5 rounded-xl border transition-all duration-300 flex items-center justify-between cursor-pointer group ${isSelected
+                        ? 'bg-gradient-to-r from-indigo-500/10 to-indigo-500/5 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-900/40 border-slate-850 hover:border-slate-700 text-slate-400 hover:text-slate-200'
+                        }`}
                     >
                       <div className="flex-1 min-w-0 pr-2">
                         <div className="flex items-center gap-2">
@@ -223,17 +282,17 @@ export default function Procurement() {
                   </div>
                 </div>
 
-                {getProductsForVendor(selectedVendor.name).length === 0 ? (
+                {getProductsForVendor(selectedVendor).length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <PackageOpen className="h-9 w-9 text-slate-700 mb-2" />
                     <p className="text-xs font-bold text-slate-450">No products linked to this vendor.</p>
                     <p className="text-[9px] text-slate-550 max-w-[250px] mt-1">
-                      Associate this vendor name in your inventory items to show them in this catalog.
+                      Associate this vendor name in your inventory items or list them as offered products to show them in this catalog.
                     </p>
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-850/60 max-h-[350px] overflow-y-auto pr-1 flex flex-col">
-                    {getProductsForVendor(selectedVendor.name).map((product) => {
+                    {getProductsForVendor(selectedVendor).map((product) => {
                       const hasPending = procurementRequests.some(r => r.item === product.name && r.status === 'Pending');
                       const currentQty = orderQuantities[product.name] ?? 25;
                       const isLoading = orderLoading[product.name] ?? false;
@@ -271,11 +330,10 @@ export default function Procurement() {
                             <button
                               onClick={() => handlePlaceOrder(product, selectedVendor.name)}
                               disabled={hasPending || isLoading || currentQty <= 0}
-                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-1.5 cursor-pointer shadow-md ${
-                                hasPending
-                                  ? 'bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed shadow-none'
-                                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/10'
-                              }`}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-1.5 cursor-pointer shadow-md ${hasPending
+                                ? 'bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed shadow-none'
+                                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/10'
+                                }`}
                             >
                               {isLoading ? (
                                 <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -312,7 +370,7 @@ export default function Procurement() {
           {recommendations.map((rec) => {
             const hasPending = procurementRequests.some(r => r.item === rec.name && r.status === 'Pending');
             return (
-              <div 
+              <div
                 key={rec.id}
                 className="glass rounded-2xl p-5 border border-slate-800 flex flex-col justify-between gap-5 relative overflow-hidden group hover:border-indigo-500/30 transition-all duration-300"
               >
@@ -344,11 +402,10 @@ export default function Procurement() {
                 <button
                   onClick={() => handleApprove(rec)}
                   disabled={hasPending}
-                  className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer shadow-md ${
-                    hasPending
-                      ? 'bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed shadow-none'
-                      : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/10'
-                  }`}
+                  className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer shadow-md ${hasPending
+                    ? 'bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed shadow-none'
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/10'
+                    }`}
                 >
                   <ShoppingCart className="h-4 w-4" />
                   <span>{hasPending ? 'Pending Vendor Accept' : 'Approve Procurement'}</span>
@@ -394,17 +451,19 @@ export default function Procurement() {
                       <td className="py-4 px-6 text-slate-400">{req.vendor}</td>
                       <td className="py-4 px-6 text-slate-500">{req.date}</td>
                       <td className="py-4 px-6">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border flex items-center gap-1 w-fit ${
-                          req.status === 'Approved' || req.status === 'Accepted'
-                            ? 'bg-emerald-500/10 text-emerald-450 border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-455 border-rose-500/20'
-                        }`}>
-                          {(req.status === 'Approved' || req.status === 'Accepted') && <CheckCircle2 className="h-3 w-3" />}
+                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border flex items-center gap-1 w-fit ${req.status === 'Approved' || req.status === 'Accepted' || req.status === 'Fulfilled & Shipped'
+                          ? 'bg-emerald-500/10 text-emerald-450 border-emerald-500/20'
+                          : req.status === 'Rejected'
+                            ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
+                            : 'bg-yellow-500/10 text-yellow-455 border-yellow-500/20'
+                          }`}>
+                          {(req.status === 'Approved' || req.status === 'Accepted' || req.status === 'Fulfilled & Shipped') && <CheckCircle2 className="h-3 w-3" />}
                           {req.status === 'Rejected' && <XCircle className="h-3 w-3" />}
+                          {req.status === 'Pending' && <Clock className="h-3 w-3 animate-pulse" />}
                           <span>
                             {req.status === 'Accepted' ? 'Accepted' :
-                             req.status === 'Approved' ? 'Fulfilled & Shipped' :
-                             req.status}
+                              req.status === 'Approved' || req.status === 'Fulfilled & Shipped' ? 'Fulfilled & Shipped' :
+                                req.status}
                           </span>
                         </span>
                       </td>
@@ -416,6 +475,93 @@ export default function Procurement() {
           )}
         </div>
       </div>
+
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 flex flex-col gap-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-850 pb-3">
+              <span className="font-bold text-sm text-slate-200">Register New Supplier</span>
+              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-500 hover:text-slate-355 cursor-pointer font-bold text-lg">×</button>
+            </div>
+
+            <form onSubmit={handleAddSupplier} className="space-y-4">
+              <div>
+                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Supplier Name</label>
+                <input
+                  type="text"
+                  required
+                  value={supName}
+                  onChange={(e) => setSupName(e.target.value)}
+                  placeholder="e.g. Acme Supplies Corp"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-955 border border-slate-850 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Business Category</label>
+                <input
+                  type="text"
+                  required
+                  value={supCategory}
+                  onChange={(e) => setSupCategory(e.target.value)}
+                  placeholder="e.g. Food & Beverage, Pharmaceuticals"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-955 border border-slate-850 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Contact Email</label>
+                <input
+                  type="email"
+                  required
+                  value={supEmail}
+                  onChange={(e) => setSupEmail(e.target.value)}
+                  placeholder="e.g. orders@acme.com"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-955 border border-slate-850 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Phone Number (Optional)</label>
+                <input
+                  type="text"
+                  value={supPhone}
+                  onChange={(e) => setSupPhone(e.target.value)}
+                  placeholder="e.g. +1 555-0199"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-955 border border-slate-850 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Products Offered (comma-separated)</label>
+                <input
+                  type="text"
+                  value={supProducts}
+                  onChange={(e) => setSupProducts(e.target.value)}
+                  placeholder="e.g. Premium Rice, Fresh Tomatoes, Organic Garlic"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-955 border border-slate-850 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs transition-colors"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/40 text-slate-400 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors cursor-pointer shadow-md shadow-indigo-600/10"
+                >
+                  Save Supplier
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

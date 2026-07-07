@@ -152,7 +152,9 @@ export default function Dashboard() {
     runAiScan,
     getAiChatResponse,
     approveRecommendation,
-    businessType
+    businessType,
+    activeMarketing,
+    activeVendorsCount
   } = useApp();
   const navigate = useNavigate();
 
@@ -208,9 +210,7 @@ export default function Dashboard() {
   // Stat Calculations
   const totalItemsCount = inventory.length;
   const pendingRequestsCount = procurementRequests.filter(r => r.status === 'Pending').length;
-  const activeVendorsSet = new Set(inventory.map(i => i.vendor).filter(Boolean));
-  const activeVendorsCount = activeVendorsSet.size;
-  const marketingCampaignsCount = marketingCampaigns.length;
+  const marketingCampaignsCount = activeMarketing;
 
   // Chart data simulation: shows hypothetical weekly Health Scores
   const chartData = [
@@ -326,7 +326,7 @@ export default function Dashboard() {
                   <Activity className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-200">AI Health Scan</h2>
+                  <h2 className="text-lg font-bold text-slate-200">Business Health Analysis</h2>
                   <p className="text-xs text-slate-500">Real-time risk assessment, stock health metrics, and automated ordering suggestions.</p>
                 </div>
               </div>
@@ -337,7 +337,7 @@ export default function Dashboard() {
                   className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-650 hover:bg-indigo-500 text-white text-xs font-bold transition-all duration-300 shadow-lg shadow-indigo-650/20 cursor-pointer group"
                 >
                   <Cpu className="h-4 w-4" />
-                  <span>Force Rescan</span>
+                  <span>Rescan</span>
                   <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               )}
@@ -463,7 +463,7 @@ export default function Dashboard() {
                     className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-indigo-650 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-black transition-all duration-300 shadow-xl shadow-indigo-650/15 hover:shadow-indigo-500/25 cursor-pointer group"
                   >
                     <Cpu className="h-4.5 w-4.5 animate-pulse" />
-                    <span>Run AI Health Scan</span>
+                    <span>Run Business Health Analysis</span>
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>

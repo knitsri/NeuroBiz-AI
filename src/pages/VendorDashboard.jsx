@@ -31,7 +31,7 @@ export default function VendorDashboard() {
   const handleAction = async (requestId, item, action) => {
     try {
       await handleVendorAction(requestId, action);
-      setActionAlert(`Order for ${item} has been ${action === 'accept' ? 'Accepted' : action === 'complete' ? 'Completed' : 'Rejected'}.`);
+      setActionAlert(`Order for ${item} has been ${action === 'accept' ? 'Accepted' : action === 'complete' ? 'Fulfilled & Shipped' : 'Rejected'}.`);
       setTimeout(() => setActionAlert(''), 4000);
     } catch (err) {
       console.error(err);
@@ -182,7 +182,7 @@ export default function VendorDashboard() {
                         className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-md shadow-emerald-600/10"
                       >
                         <Check className="h-3.5 w-3.5" />
-                        <span>Mark as Done</span>
+                        <span>Mark as Shipped</span>
                       </button>
                     </div>
                   </div>

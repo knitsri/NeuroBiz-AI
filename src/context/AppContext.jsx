@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, addDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { getUserProfile, logoutUser } from '../services/auth';
 import {
@@ -41,6 +41,17 @@ export const AppProvider = ({ children }) => {
   const [vendorsList, setVendorsList] = useState([]);
 
   const [lastScanResults, setLastScanResults] = useState(null);
+  const [activeMarketing, setActiveMarketing] = useState(0);
+
+  // Synchronize dynamic active marketing workspace state (owner-scoped)
+  useEffect(() => {
+    if (currentUser) {
+      const saved = localStorage.getItem(`neurobiz_marketing_workspace_${currentUser.uid}`);
+      setActiveMarketing(saved ? 1 : 0);
+    } else {
+      setActiveMarketing(0);
+    }
+  }, [currentUser]);
 
   // Listen to Firebase Auth state updates
   useEffect(() => {
@@ -259,42 +270,100 @@ export const AppProvider = ({ children }) => {
     if (!currentUser) return "Please sign in to ask questions.";
 
     try {
-      // Fetch Firestore data
-      const invQuery = query(collection(db, 'inventory'), where('ownerUid', '==', currentUser.uid));
-      const invSnap = await getDocs(invQuery);
-      const dbInventory = [];
-      invSnap.forEach(d => dbInventory.push({ id: d.id, ...d.data() }));
+      let businessData = {};
 
-      const procQuery = query(collection(db, 'procurements'), where('ownerUid', '==', currentUser.uid));
-      const procSnap = await getDocs(procQuery);
-      const dbProcurements = [];
-      procSnap.forEach(d => dbProcurements.push({ id: d.id, ...d.data() }));
+      if (activeRole === 'vendor') {
+        // Query procurements assigned to this vendor name
+        const procQuery = query(
+          collection(db, 'procurements'), 
+          where('vendor', '==', currentUser.businessName || '')
+        );
+        const procSnap = await getDocs(procQuery);
+        const dbProcurements = [];
+        procSnap.forEach(d => dbProcurements.push({ id: d.id, ...d.data() }));
 
-      const vendorQuery = query(collection(db, 'vendors'), where('ownerUid', '==', currentUser.uid));
-      const vendorSnap = await getDocs(vendorQuery);
-      const dbVendors = [];
-      vendorSnap.forEach(d => dbVendors.push({ id: d.id, ...d.data() }));
+        const activeContracts = dbProcurements.filter(p => p.status === 'Accepted');
+        const pendingRequests = dbProcurements.filter(p => p.status === 'Pending');
+        const completedDeliveries = dbProcurements.filter(p => p.status === 'Fulfilled & Shipped');
+        const rejectedOrders = dbProcurements.filter(p => p.status === 'Rejected');
 
-      const businessData = {
-        businessType,
-        businessName: currentUser.businessName,
-        ownerName: currentUser.ownerName,
-        inventory: dbInventory.map(i => ({
-          name: i.name ?? i.itemName ?? "",
-          category: i.category,
-          stock: i.stock,
-          minimumStock: i.minimumStock,
-          vendor: i.vendor,
-          status: i.status
-        })),
-        procurements: dbProcurements.map(p => ({
-          item: p.item,
-          quantity: p.quantity,
-          vendor: p.vendor,
-          status: p.status
-        })),
-        vendors: dbVendors.map(v => ({ name: v.name }))
-      };
+        // SME customers
+        const smeCustomers = Array.from(new Set(dbProcurements.map(p => p.businessName).filter(Boolean)));
+
+        businessData = {
+          role: 'vendor',
+          vendorName: currentUser.businessName,
+          ownerName: currentUser.ownerName,
+          email: currentUser.email,
+          pendingRequests: pendingRequests.map(p => ({
+            id: p.id,
+            item: p.item,
+            quantity: p.quantity,
+            businessName: p.businessName,
+            date: p.date
+          })),
+          activeContracts: activeContracts.map(p => ({
+            id: p.id,
+            item: p.item,
+            quantity: p.quantity,
+            businessName: p.businessName,
+            date: p.date
+          })),
+          completedDeliveries: completedDeliveries.map(p => ({
+            id: p.id,
+            item: p.item,
+            quantity: p.quantity,
+            businessName: p.businessName,
+            date: p.date
+          })),
+          rejectedOrders: rejectedOrders.map(p => ({
+            id: p.id,
+            item: p.item,
+            quantity: p.quantity,
+            businessName: p.businessName,
+            date: p.date
+          })),
+          smeCustomers
+        };
+      } else {
+        // Fetch Owner Firestore data
+        const invQuery = query(collection(db, 'inventory'), where('ownerUid', '==', currentUser.uid));
+        const invSnap = await getDocs(invQuery);
+        const dbInventory = [];
+        invSnap.forEach(d => dbInventory.push({ id: d.id, ...d.data() }));
+
+        const procQuery = query(collection(db, 'procurements'), where('ownerUid', '==', currentUser.uid));
+        const procSnap = await getDocs(procQuery);
+        const dbProcurements = [];
+        procSnap.forEach(d => dbProcurements.push({ id: d.id, ...d.data() }));
+
+        const vendorQuery = query(collection(db, 'vendors'), where('ownerUid', '==', currentUser.uid));
+        const vendorSnap = await getDocs(vendorQuery);
+        const dbVendors = [];
+        vendorSnap.forEach(d => dbVendors.push({ id: d.id, ...d.data() }));
+
+        businessData = {
+          role: 'owner',
+          businessType,
+          businessName: currentUser.businessName,
+          ownerName: currentUser.ownerName,
+          inventory: dbInventory.map(i => ({
+            name: i.name ?? i.itemName ?? "",
+            category: i.category,
+            stock: i.stock,
+            minimumStock: i.minimumStock,
+            vendor: i.vendor,
+            status: i.status
+          })),
+          procurements: dbProcurements.map(p => ({
+            item: p.item,
+            quantity: p.quantity,
+            vendor: p.vendor,
+            status: p.status
+          })),
+          vendors: dbVendors.map(v => ({ name: v.name }))
+        };
+      }
 
       const { askGeminiAssistant } = await import('../services/gemini');
       return await askGeminiAssistant(businessData, question);
@@ -431,7 +500,7 @@ export const AppProvider = ({ children }) => {
       // Category 4: Stock Availability (Max 20 points)
       // Healthy items / total items ratio. If no items, give 20.
       const healthyItems = dbInventory.filter(i => i.status === 'In Stock');
-      const stockScore = dbInventory.length > 0 
+      const stockScore = dbInventory.length > 0
         ? Math.round((healthyItems.length / dbInventory.length) * 20)
         : 20;
 
@@ -512,6 +581,22 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const addSupplier = async (supplierData) => {
+    if (currentUser) {
+      const docRef = await addDoc(collection(db, 'vendors'), {
+        ownerUid: currentUser.uid,
+        name: supplierData.name,
+        category: supplierData.category,
+        email: supplierData.email,
+        contact: supplierData.phone || '',
+        products: supplierData.products || '',
+        createdAt: new Date().toISOString()
+      });
+      return { id: docRef.id, ...supplierData };
+    }
+    throw new Error("No authenticated user.");
+  };
+
   // Sign out mapping
   const logout = async () => {
     await logoutUser();
@@ -520,7 +605,8 @@ export const AppProvider = ({ children }) => {
   // Derived Dashboard Metrics directly from Firestore state synchronizers
   const totalItemsCount = inventory.length;
   const pendingRequestsCount = procurementRequests.filter(r => r.status === 'Pending').length;
-  const activeVendorsCount = vendorsList.length;
+  const uniqueVendorsSet = new Set(vendorsList.map(v => (v.name || '').trim().toLowerCase()).filter(Boolean));
+  const activeVendorsCount = uniqueVendorsSet.size;
   const marketingCampaignsCount = marketingCampaigns.length;
 
   return (
@@ -541,6 +627,8 @@ export const AppProvider = ({ children }) => {
       pendingRequestsCount,
       activeVendorsCount,
       marketingCampaignsCount,
+      activeMarketing,
+      setActiveMarketing,
 
       // Operations
       addItem: addInventoryItem,
@@ -555,6 +643,7 @@ export const AppProvider = ({ children }) => {
       askAiAssistant,
       generateAiCampaign,
       runAiScan,
+      addSupplier,
       logout
     }}>
       {children}

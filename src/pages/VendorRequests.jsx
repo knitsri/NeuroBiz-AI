@@ -89,7 +89,7 @@ export default function VendorRequests() {
                     className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-md shadow-emerald-600/10"
                   >
                     <Check className="h-4 w-4" />
-                    <span>Approve & Ship</span>
+                    <span>Approve</span>
                   </button>
                 </div>
               </div>

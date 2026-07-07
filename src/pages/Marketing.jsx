@@ -56,22 +56,11 @@ import {
 } from 'lucide-react';
 
 export default function Marketing() {
-  const { inventory, generateAiCampaign, businessType, currentUser } = useApp();
+  const { inventory, generateAiCampaign, businessType, currentUser, setActiveMarketing } = useApp();
 
   const [selectedProduct, setSelectedProduct] = useState('');
   const [promoType, setPromoType] = useState('Clearance Sale');
   const [discount, setDiscount] = useState(20);
-
-  // Synchronize dynamic initial promotion type based on business category
-  useEffect(() => {
-    if (businessType === 'restaurant') {
-      setPromoType("Chef's Special");
-    } else if (businessType === 'pharmacy') {
-      setPromoType("Wellness Week");
-    } else {
-      setPromoType("Clearance Sale");
-    }
-  }, [businessType]);
 
   const getCampaignTypes = () => {
     if (businessType === 'restaurant') {
@@ -117,6 +106,57 @@ export default function Marketing() {
   const [isRegeneratingPoster, setIsRegeneratingPoster] = useState(false);
   
   const [currentAsset, setCurrentAsset] = useState(null);
+
+  // Synchronize initial selection & restore saved workspace state (owner-scoped)
+  useEffect(() => {
+    if (!currentUser) {
+      setCurrentAsset(null);
+      setSelectedProduct('');
+      setDiscount(20);
+      return;
+    }
+
+    const saved = localStorage.getItem(`neurobiz_marketing_workspace_${currentUser.uid}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setCurrentAsset(parsed);
+        if (parsed.selectedProduct) setSelectedProduct(parsed.selectedProduct);
+        if (parsed.promoType) setPromoType(parsed.promoType);
+        if (parsed.discount) setDiscount(Number(parsed.discount));
+      } catch (e) {
+        console.error("Error restoring marketing workspace:", e);
+      }
+    } else {
+      setCurrentAsset(null);
+      setSelectedProduct('');
+      setDiscount(20);
+      if (businessType === 'restaurant') {
+        setPromoType("Chef's Special");
+      } else if (businessType === 'pharmacy') {
+        setPromoType("Wellness Week");
+      } else {
+        setPromoType("Clearance Sale");
+      }
+    }
+  }, [currentUser, businessType]);
+
+  const handleClearWorkspace = () => {
+    setCurrentAsset(null);
+    setSelectedProduct('');
+    if (businessType === 'restaurant') {
+      setPromoType("Chef's Special");
+    } else if (businessType === 'pharmacy') {
+      setPromoType("Wellness Week");
+    } else {
+      setPromoType("Clearance Sale");
+    }
+    setDiscount(20);
+    if (currentUser) {
+      localStorage.removeItem(`neurobiz_marketing_workspace_${currentUser.uid}`);
+    }
+    setActiveMarketing(0);
+  };
   
   // Feedback states
   const [copiedType, setCopiedType] = useState('');
@@ -326,12 +366,20 @@ export default function Marketing() {
       const data = await response.json();
 
       // 3. Set to state (uses the Storage URL returned as imageUrl and maps captions to render keys)
-      setCurrentAsset({
+      const assetData = {
         ...aiCampaign,
         instagram: aiCampaign.instagramCaption || aiCampaign.instagram || '',
         whatsapp: aiCampaign.whatsappPromotion || aiCampaign.whatsapp || '',
-        posterUrl: data.imageUrl
-      });
+        posterUrl: data.imageUrl,
+        selectedProduct,
+        promoType,
+        discount
+      };
+      setCurrentAsset(assetData);
+      if (currentUser) {
+        localStorage.setItem(`neurobiz_marketing_workspace_${currentUser.uid}`, JSON.stringify(assetData));
+      }
+      setActiveMarketing(1);
       
       if (showFallbackWarning) {
         setToastType('error');
@@ -432,12 +480,20 @@ export default function Marketing() {
 
       const data = await response.json();
       
-      setCurrentAsset({
+      const assetData = {
         ...aiCampaign,
         instagram: aiCampaign.instagramCaption || aiCampaign.instagram || '',
         whatsapp: aiCampaign.whatsappPromotion || aiCampaign.whatsapp || '',
-        posterUrl: data.imageUrl
-      });
+        posterUrl: data.imageUrl,
+        selectedProduct,
+        promoType,
+        discount: offsetDiscount
+      };
+      setCurrentAsset(assetData);
+      if (currentUser) {
+        localStorage.setItem(`neurobiz_marketing_workspace_${currentUser.uid}`, JSON.stringify(assetData));
+      }
+      setActiveMarketing(1);
       
       if (showFallbackWarning) {
         setToastType('error');
@@ -714,6 +770,16 @@ export default function Marketing() {
                 </>
               )}
             </button>
+
+            {currentAsset && (
+              <button
+                type="button"
+                onClick={handleClearWorkspace}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 hover:border-rose-500/30 hover:bg-rose-500/5 text-slate-400 hover:text-rose-455 font-bold text-xs transition-all duration-300 mt-2 cursor-pointer"
+              >
+                <span>Clear Workspace</span>
+              </button>
+            )}
           </form>
         </div>
 
