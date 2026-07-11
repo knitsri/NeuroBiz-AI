@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export default function Profile() {
-  const { currentUser, initializeBusiness, activeRole, setIsAvatarModalOpen } = useApp();
+  const { currentUser, updateUserProfile, activeRole, setIsAvatarModalOpen } = useApp();
 
   const [name, setName] = useState(currentUser?.name || '');
   const [bizName, setBizName] = useState(currentUser?.businessName || '');
@@ -21,20 +21,38 @@ export default function Profile() {
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [showSavedAlert, setShowSavedAlert] = useState(false);
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
 
-    // Save to global state by re-initializing business with updated info
-    initializeBusiness(
-      currentUser.businessType,
-      activeRole,
-      name,
-      email,
-      bizName
-    );
+    const cleanPhone = phone.trim().replace(/[\s\-\(\)]/g, '');
+    let finalPhone = cleanPhone;
 
-    setShowSavedAlert(true);
-    setTimeout(() => setShowSavedAlert(false), 3000);
+    if (cleanPhone) {
+      if (/^[6-9]\d{9}$/.test(cleanPhone)) {
+        finalPhone = `+91${cleanPhone}`;
+      } else if (/^\+\d{10,15}$/.test(cleanPhone)) {
+        finalPhone = cleanPhone;
+      } else {
+        alert("Please enter a valid phone number (e.g. 10-digit Indian mobile number 9876543210, or in international format like +919876543210).");
+        return;
+      }
+    }
+
+    try {
+      await updateUserProfile({
+        name,
+        businessName: bizName,
+        email,
+        phone: finalPhone
+      });
+      setPhone(finalPhone); // Visual feedback with normalized format
+
+      setShowSavedAlert(true);
+      setTimeout(() => setShowSavedAlert(false), 3000);
+    } catch (err) {
+      console.error("Failed to save profile:", err);
+      alert("Failed to save profile configuration: " + err.message);
+    }
   };
 
   return (

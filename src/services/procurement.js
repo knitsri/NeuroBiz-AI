@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { addNotification } from './notifications';
+import { sendWhatsAppNotification } from './whatsapp';
 
 // Owner approves recommendation: creates a new procurement request doc
 export async function approveRecommendation(ownerUid, rec, businessName, businessType) {
@@ -48,12 +49,30 @@ export async function approveRecommendation(ownerUid, rec, businessName, busines
       const userSnapshot = await getDocs(usersQuery);
       if (!userSnapshot.empty) {
         const vendorUid = userSnapshot.docs[0].id;
+        const vendorData = userSnapshot.docs[0].data();
         await addNotification(
           vendorUid,
           'info',
           'Inbound Order Request',
           `New procurement request from ${businessName} for ${rec.name} (${rec.recommendedStock} units).`
         );
+
+        if (vendorData.phone) {
+          const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+          const waMessage = `📦 NeuroBiz
+
+New Procurement Request
+
+Business: ${businessName}
+Item: ${rec.name}
+Quantity: ${rec.recommendedStock}
+
+Please review it from your Vendor Dashboard.
+
+Open Dashboard:
+${appUrl}`;
+          await sendWhatsAppNotification(vendorData.phone, waMessage);
+        }
       }
     } catch (err) {
       console.error('Failed to notify vendor user:', err);
@@ -117,6 +136,50 @@ export async function handleVendorAction(requestId, action, ownerUid) {
         `Vendor ${requestData.vendor} has ${action === 'accept' ? 'accepted' : 'rejected'} order of ${requestData.item}.`,
         action === 'accept' ? 'success' : 'warning'
       );
+    }
+
+    if (action === 'accept' || action === 'complete') {
+      try {
+        const ownerProfileDoc = await getDoc(doc(db, 'users', requestData.ownerUid));
+        if (ownerProfileDoc.exists()) {
+          const ownerData = ownerProfileDoc.data();
+          if (ownerData.phone) {
+            const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+            let waMessage = "";
+            if (action === 'accept') {
+              waMessage = `✅ NeuroBiz
+
+Your procurement request has been accepted.
+
+Vendor: ${requestData.vendor}
+Item: ${requestData.item}
+Quantity: ${requestData.quantity}
+
+Status: Active Contract
+
+Open Dashboard:
+${appUrl}`;
+            } else if (action === 'complete') {
+              waMessage = `🚚 NeuroBiz
+
+Your order has been shipped.
+
+Vendor: ${requestData.vendor}
+Item: ${requestData.item}
+
+Status: Fulfilled & Shipped
+
+Open Dashboard:
+${appUrl}`;
+            }
+            if (waMessage) {
+              await sendWhatsAppNotification(ownerData.phone, waMessage);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to notify owner via WhatsApp:", err);
+      }
     }
 
     // Notify Vendor of the action taken
