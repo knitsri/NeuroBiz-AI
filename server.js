@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import twilio from 'twilio';
 
 dotenv.config();
 
@@ -207,6 +208,48 @@ CRITICAL: Do NOT include any text, product names, slogans, numbers, discount per
     res.status(500).json({
       error: "INTERNAL_ERROR",
       message: error.message || "Failed to generate campaign assets."
+    });
+  }
+});
+
+app.post('/api/send-whatsapp', async (req, res) => {
+  const { to, message } = req.body;
+  
+  if (!to || !message) {
+    return res.status(400).json({ error: "Recipient ('to') and 'message' are required." });
+  }
+
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+
+  if (!accountSid || !authToken || !fromNumber) {
+    return res.status(500).json({
+      error: "CONFIGURATION_ERROR",
+      message: "Twilio credentials are missing on the server."
+    });
+  }
+
+  try {
+    const client = twilio(accountSid, authToken);
+    const formattedTo = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+    const formattedFrom = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`;
+
+    const twilioResponse = await client.messages.create({
+      from: formattedFrom,
+      to: formattedTo,
+      body: message
+    });
+
+    return res.json({
+      success: true,
+      sid: twilioResponse.sid
+    });
+  } catch (error) {
+    console.error("Twilio send error:", error);
+    return res.status(500).json({
+      error: "SEND_ERROR",
+      message: error.message || "Failed to send WhatsApp message."
     });
   }
 });

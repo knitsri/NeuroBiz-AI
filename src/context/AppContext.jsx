@@ -598,6 +598,14 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const updateUserProfile = async (profileData) => {
+    if (currentUser) {
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, profileData);
+      setCurrentUser(prev => ({ ...prev, ...profileData }));
+    }
+  };
+
   // Derived Dashboard Metrics directly from Firestore state synchronizers
   const totalItemsCount = inventory.length;
   const pendingRequestsCount = procurementRequests.filter(r => r.status === 'Pending').length;
@@ -643,7 +651,8 @@ export const AppProvider = ({ children }) => {
       logout,
       isAvatarModalOpen,
       setIsAvatarModalOpen,
-      updateProfileAvatar
+      updateProfileAvatar,
+      updateUserProfile
     }}>
       {children}
     </AppContext.Provider>
