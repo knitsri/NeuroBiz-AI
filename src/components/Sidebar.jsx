@@ -13,7 +13,7 @@ import {
   Activity
 } from 'lucide-react';
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen, setMobileOpen }) {
   const { currentUser, logout, activeRole } = useApp();
   const navigate = useNavigate();
 
@@ -42,7 +42,9 @@ export default function Sidebar() {
   const links = activeRole === 'owner' ? ownerLinks : vendorLinks;
 
   return (
-    <aside className="w-64 glass border-r border-slate-800 flex flex-col h-screen fixed left-0 top-0 z-30">
+    <aside className={`w-64 glass border-r border-slate-800 flex flex-col h-screen fixed left-0 top-0 z-30 transition-transform duration-300 md:translate-x-0 ${
+      mobileOpen ? 'translate-x-0' : '-translate-x-full'
+    }`}>
       {/* Logo Area */}
       <div className="p-6 flex items-center gap-3 border-b border-slate-800/80">
         <div className="p-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl flex items-center justify-center animate-pulse-slow">
@@ -62,6 +64,7 @@ export default function Sidebar() {
             <NavLink
               key={link.path}
               to={link.path}
+              onClick={() => setMobileOpen(false)}
               className={({ isActive }) => `
                 flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-medium text-sm group
                 ${isActive

@@ -155,7 +155,7 @@ export default function Procurement() {
   const pastOwnerRequests = procurementRequests;
 
   return (
-    <div className="pt-20 pl-72 pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6">
+    <div className="pt-20 pl-4 md:pl-72 pr-4 md:pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6">
 
       {/* Page Title */}
       <div>
@@ -172,13 +172,13 @@ export default function Procurement() {
 
       {/* Section 1: Supplier Directory */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5 mb-0">
             <Building2 className="h-4 w-4" /> Supplier Directory
           </h3>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="px-8 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[13px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-md shadow-indigo-600/10"
+            className="px-8 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[13px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-md shadow-indigo-600/10 w-full sm:w-auto"
           >
             <span>+ Add Supplier</span>
           </button>

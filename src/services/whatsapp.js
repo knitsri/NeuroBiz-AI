@@ -30,3 +30,9 @@ export async function sendWhatsAppNotification(to, message) {
     return false;
   }
 }
+
+export function triggerToast(message, type = 'success') {
+  window.dispatchEvent(new CustomEvent('neurobiz-toast', {
+    detail: { message, type }
+  }));
+}

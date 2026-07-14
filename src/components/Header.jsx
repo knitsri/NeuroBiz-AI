@@ -8,10 +8,11 @@ import {
   CheckCircle2,
   Clock,
   Info,
-  XCircle
+  XCircle,
+  Menu
 } from 'lucide-react';
 
-export default function Header() {
+export default function Header({ setMobileOpen }) {
   const {
     currentUser,
     activeRole,
@@ -105,10 +106,17 @@ export default function Header() {
   };
 
   return (
-    <header className="h-16 glass border-b border-slate-800/80 flex items-center justify-between px-8 fixed top-0 right-0 left-64 z-20">
+    <header className="h-16 glass border-b border-slate-800/80 flex items-center justify-between px-4 md:px-8 fixed top-0 right-0 left-0 md:left-64 z-20">
       {/* Title */}
-      <div className="flex items-center gap-4">
-        <h1 className="text-xl font-bold tracking-tight text-slate-100">{getPageTitle()}</h1>
+      <div className="flex items-center gap-2 md:gap-4">
+        <button 
+          onClick={() => setMobileOpen(prev => !prev)}
+          className="p-1.5 rounded-lg text-slate-450 hover:text-slate-200 hover:bg-slate-800/40 md:hidden cursor-pointer shrink-0 transition-colors"
+          title="Open Menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <h1 className="text-base sm:text-xl font-bold tracking-tight text-slate-100 truncate">{getPageTitle()}</h1>
         <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-semibold tracking-wider uppercase animate-pulse-slow">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
           AI Engine Online
