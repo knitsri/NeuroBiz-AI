@@ -92,7 +92,7 @@ export default function AIAssistantPanel() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={() => { setIsOpen(true); setIsMinimized(false); }}
-            className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white flex items-center justify-center shadow-xl shadow-indigo-550/20 hover:shadow-indigo-500/35 border border-indigo-400/20 cursor-pointer group"
+            className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-40 h-14 w-14 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white flex items-center justify-center shadow-xl shadow-indigo-550/20 hover:shadow-indigo-500/35 border border-indigo-400/20 cursor-pointer group"
           >
             <Brain className="h-6 w-6 text-white group-hover:scale-110 transition-transform duration-300" />
             <span className="absolute -top-1 -right-1 h-3 w-3 bg-emerald-500 rounded-full border-2 border-slate-950 animate-pulse"></span>
@@ -108,7 +108,7 @@ export default function AIAssistantPanel() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0.5 }}
             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-            className={`fixed right-6 bottom-6 z-50 w-96 glass border border-slate-800 shadow-2xl rounded-3xl overflow-hidden flex flex-col transition-all duration-300 ${
+            className={`fixed right-4 sm:right-6 bottom-4 sm:bottom-6 z-50 w-[calc(100%-2rem)] sm:w-96 glass border border-slate-800 shadow-2xl rounded-3xl overflow-hidden flex flex-col transition-all duration-300 ${
               isMinimized ? 'h-14' : 'h-[500px]'
             }`}
           >

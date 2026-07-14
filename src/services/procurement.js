@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { addNotification } from './notifications';
-import { sendWhatsAppNotification } from './whatsapp';
+import { sendWhatsAppNotification, triggerToast } from './whatsapp';
 
 // Owner approves recommendation: creates a new procurement request doc
 export async function approveRecommendation(ownerUid, rec, businessName, businessType) {
@@ -71,11 +71,21 @@ Please review it from your Vendor Dashboard.
 
 Open Dashboard:
 ${appUrl}`;
-          await sendWhatsAppNotification(vendorData.phone, waMessage);
+          const isSent = await sendWhatsAppNotification(vendorData.phone, waMessage);
+          if (isSent) {
+            triggerToast(`📱 WhatsApp notification sent to ${rec.vendor}.`, 'success');
+          } else {
+            triggerToast("⚠️ Action completed successfully, but the WhatsApp notification could not be delivered.", "error");
+          }
+        } else {
+          triggerToast("ℹ️ No phone number configured. WhatsApp notification was skipped.", "info");
         }
+      } else {
+        triggerToast("ℹ️ No phone number configured. WhatsApp notification was skipped.", "info");
       }
     } catch (err) {
       console.error('Failed to notify vendor user:', err);
+      triggerToast("⚠️ Action completed successfully, but the WhatsApp notification could not be delivered.", "error");
     }
 
     return docRef.id;
@@ -173,12 +183,22 @@ Open Dashboard:
 ${appUrl}`;
             }
             if (waMessage) {
-              await sendWhatsAppNotification(ownerData.phone, waMessage);
+              const isSent = await sendWhatsAppNotification(ownerData.phone, waMessage);
+              if (isSent) {
+                triggerToast(`📱 WhatsApp notification sent to ${requestData.businessName}.`, 'success');
+              } else {
+                triggerToast("⚠️ Action completed successfully, but the WhatsApp notification could not be delivered.", "error");
+              }
             }
+          } else {
+            triggerToast("ℹ️ No phone number configured. WhatsApp notification was skipped.", "info");
           }
+        } else {
+          triggerToast("ℹ️ No phone number configured. WhatsApp notification was skipped.", "info");
         }
       } catch (err) {
         console.error("Failed to notify owner via WhatsApp:", err);
+        triggerToast("⚠️ Action completed successfully, but the WhatsApp notification could not be delivered.", "error");
       }
     }
 

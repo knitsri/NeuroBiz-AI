@@ -360,7 +360,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="pt-20 pl-72 pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6">
+    <div className="pt-20 pl-4 md:pl-72 pr-4 md:pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6">
       {/* Top Grid: Operational Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <DashboardStatCard 
@@ -399,7 +399,7 @@ export default function Dashboard() {
         {/* Left Col: AI Health Scan (Takes 2 or 3 columns depending on scan status) */}
         <div className={`${lastScanResults ? 'lg:col-span-2' : 'lg:col-span-3'} flex flex-col gap-6 transition-all duration-500`}>
           {/* AI Health Scan Card */}
-          <div className="glass rounded-3xl p-6 border border-slate-800 relative overflow-hidden h-[730px] flex flex-col">
+          <div className="glass rounded-3xl p-4 sm:p-6 border border-slate-800 relative overflow-hidden h-auto lg:h-[730px] flex flex-col">
             {/* Background design elements */}
             <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -717,7 +717,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
-              className="lg:col-span-1 glass rounded-3xl p-6 border border-slate-800 flex flex-col justify-between h-[730px] overflow-y-auto scrollbar-thin"
+              className="lg:col-span-1 glass rounded-3xl p-4 sm:p-6 border border-slate-800 flex flex-col justify-between h-auto lg:h-[730px] overflow-y-auto scrollbar-thin"
             >
               <div className="space-y-5">
                 <div>

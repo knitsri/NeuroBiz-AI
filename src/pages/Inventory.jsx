@@ -91,18 +91,18 @@ export default function Inventory() {
   });
 
   return (
-    <div className="pt-20 pl-72 pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6">
+    <div className="pt-20 pl-4 md:pl-72 pr-4 md:pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6">
       
       {/* Top Banner & Action */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-200">Inventory Ledger</h2>
-          <p className="text-xs text-slate-500">Add, edit, track and audit all your warehouse SKU assets.</p>
+          <p className="text-xs text-slate-505">Add, edit, track and audit all your warehouse SKU assets.</p>
         </div>
         
         <button
           onClick={() => setIsAddOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all duration-300 shadow-md shadow-indigo-600/10 cursor-pointer"
+          className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all duration-300 shadow-md shadow-indigo-600/10 cursor-pointer self-start sm:self-auto w-full sm:w-auto"
         >
           <Plus className="h-4 w-4" />
           <span>Add SKU Item</span>
@@ -110,7 +110,7 @@ export default function Inventory() {
       </div>
 
       {/* Control Panel: Search & Filters */}
-      <div className="glass rounded-2xl p-4 border border-slate-805 flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="glass rounded-2xl p-4 border border-slate-805 flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
         {/* Search */}
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />

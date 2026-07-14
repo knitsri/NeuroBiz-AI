@@ -661,7 +661,7 @@ export default function Marketing() {
   };
 
   return (
-    <div className="pt-20 pl-72 pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6 relative">
+    <div className="pt-20 pl-4 md:pl-72 pr-4 md:pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6 relative">
 
       {/* Toast popup */}
       {showToast && (
