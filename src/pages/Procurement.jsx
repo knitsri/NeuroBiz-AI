@@ -48,7 +48,6 @@ export function getProductPrice(name) {
 
 export default function Procurement() {
   const [recommendations, setRecommendations] = useState([]);
-  console.log("PROCUREMENT COMPONENT RENDERED, recommendations.length:", recommendations.length);
   const { currentUser, businessType, procurementRequests, approveRecommendation, vendorsList, inventory, addSupplier } = useApp();
   const [successMessage, setSuccessMessage] = useState('');
   const [selectedVendor, setSelectedVendor] = useState(null);
@@ -67,62 +66,27 @@ export default function Procurement() {
 
 
   useEffect(() => {
-    console.log("DEBUG: Complete inventory array:", inventory);
-    console.log("DEBUG: Complete procurementRequests array:", procurementRequests);
-
-    // Before filtering, print each inventory item
-    inventory.forEach(item => {
-      console.log("DEBUG: Before filter:", item.name, item.stock);
-    });
-
-    // 1. Low stock filter
-    const lowStockItems = inventory.filter(item => {
-      return item.stock <= 10;
-    });
-    console.log("DEBUG: After low-stock filter:", lowStockItems);
-
-    // 2. Map items to recommendation objects
-    const mappedRecommendations = lowStockItems.map(item => {
-      const qty = Math.max(25, (item.minimumStock * 4) - item.stock);
-      const price = getProductPrice(item.name);
-      return {
-        id: `rec-${item.id}`,
-        name: item.name,
-        currentStock: item.stock,
-        recommendedStock: qty,
-        vendor: item.vendor || 'A-1 Logistics',
-        price: price,
-        totalAmount: price * qty
-      };
-    });
-
-    // 3. Pending/Accepted filter
-    mappedRecommendations.forEach(rec => {
-      console.log("DEBUG: Before Pending/Accepted filter:", rec.name);
-    });
-
-    const finalRecs = mappedRecommendations.filter(rec => {
-      console.log("DEBUG: Inside Pending/Accepted filter:", {
-        recommendationItem: rec.name,
-        procurementItems: procurementRequests.map(r => ({
-          item: r.item,
-          status: r.status
-        }))
+    const recs = inventory
+      .filter(item => item.stock <= 10)
+      .map(item => {
+        const qty = Math.max(25, (item.minimumStock * 4) - item.stock);
+        const price = getProductPrice(item.name);
+        return {
+          id: `rec-${item.id}`,
+          name: item.name,
+          currentStock: item.stock,
+          recommendedStock: qty,
+          vendor: item.vendor || 'A-1 Logistics',
+          price: price,
+          totalAmount: price * qty
+        };
+      })
+      .filter(rec => {
+        const hasPendingOrAccepted = procurementRequests.some(r => r.item === rec.name && (r.status === 'Pending' || r.status === 'Accepted'));
+        return !hasPendingOrAccepted;
       });
-
-      const hasPendingOrAccepted = procurementRequests.some(r => r.item === rec.name && (r.status === 'Pending' || r.status === 'Accepted'));
-      return !hasPendingOrAccepted;
-    });
-
-    console.log("DEBUG: Final recommendations array before setRecommendations:", finalRecs);
-    console.log("SETTING RECOMMENDATIONS", finalRecs);
-    setRecommendations(finalRecs);
-    console.log("SET RECOMMENDATIONS CALLED");
+    setRecommendations(recs);
   }, [inventory, procurementRequests]);
-
-  useEffect(() => {
-    console.log("recommendations state changed:", recommendations);
-  }, [recommendations]);
 
   // Filter vendors list to remove duplicate entries by name
   const uniqueVendors = [];
@@ -240,7 +204,7 @@ export default function Procurement() {
     try {
       const amount = req.totalAmount || ((req.price || 120) * req.quantity);
 
-      const createResponse = await fetch('/api/create-order', {
+      const createResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/create-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -269,7 +233,7 @@ export default function Procurement() {
         order_id: orderId,
         handler: async function (response) {
           try {
-            const verifyResponse = await fetch('/api/verify-payment', {
+            const verifyResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/verify-payment`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

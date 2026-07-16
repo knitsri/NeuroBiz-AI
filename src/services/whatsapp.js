@@ -7,9 +7,9 @@ export async function sendWhatsAppNotification(to, message) {
     // Gracefully skip if no recipient phone is defined
     return false;
   }
-  
+
   try {
-    const response = await fetch('/api/send-whatsapp', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/send-whatsapp`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

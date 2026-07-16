@@ -437,7 +437,7 @@ export default function Marketing() {
       }
 
       // Call backend image generator endpoint
-      const response = await fetch('/api/generate-image', {
+      const response = await fetch(`${API_URL}/api/generate-image`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
