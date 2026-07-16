@@ -17,12 +17,18 @@ import { sendWhatsAppNotification, triggerToast } from './whatsapp';
 // Owner approves recommendation: creates a new procurement request doc
 export async function approveRecommendation(ownerUid, rec, businessName, businessType) {
   try {
+    const price = rec.price || 120;
+    const quantity = rec.recommendedStock;
+    const totalAmount = price * quantity;
+
     const newRequest = {
       ownerUid,
       businessName,
       businessType,
       item: rec.name,
-      quantity: rec.recommendedStock,
+      quantity: quantity,
+      price: price,
+      totalAmount: totalAmount,
       vendor: rec.vendor,
       status: 'Pending',
       date: new Date().toLocaleDateString(),
@@ -219,8 +225,8 @@ ${appUrl}`;
       );
     }
 
-    // If accepted, update the inventory stock levels for the owner in Firestore!
-    if (action === 'accept') {
+    // If complete (shipped), update the inventory stock levels for the owner in Firestore!
+    if (action === 'complete') {
       // Find inventory doc (check both name and itemName for backward compatibility)
       let invQuery = query(
         collection(db, 'inventory'), 
@@ -244,8 +250,8 @@ ${appUrl}`;
         
         const newStock = Number(invData.stock || 0) + Number(requestData.quantity);
         let newStatus = 'In Stock';
-        if (newStock <= 0) newStatus = 'Out of Stock';
-        else if (newStock <= Number(invData.minimumStock || 15)) newStatus = 'Low Stock';
+        if (newStock === 0) newStatus = 'Out of Stock';
+        else if (newStock <= 10) newStatus = 'Low Stock';
 
         // Update inventory item in Firestore
         await updateDoc(doc(db, 'inventory', invDoc.id), {

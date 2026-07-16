@@ -19,7 +19,11 @@ export default function VendorRequests() {
 
   const handleAction = (requestId, item, action) => {
     handleVendorAction(requestId, action);
-    setActionAlert(`Order for ${item} has been ${action === 'accept' ? 'Approved & Shipped' : 'Rejected'}.`);
+    setActionAlert(
+      action === 'accept'
+        ? `✅ Procurement request accepted successfully.`
+        : `Order for ${item} has been Rejected.`
+    );
     setTimeout(() => setActionAlert(''), 3000);
   };
 

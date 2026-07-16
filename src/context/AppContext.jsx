@@ -25,6 +25,43 @@ import {
   addNotification as addNotificationService
 } from '../services/notifications';
 
+export function calculateHealthScore(inventory, procurements, vendors, activeMarketing) {
+  const outOfStockItems = inventory.filter(i => i.status === 'Out of Stock' || i.stock === 0);
+  const lowStockItems = inventory.filter(i => i.status === 'Low Stock' || (i.stock > 0 && i.stock <= 10));
+  let inventoryScore = 30 - (outOfStockItems.length * 8) - (lowStockItems.length * 4);
+  inventoryScore = Math.max(0, Math.min(30, inventoryScore));
+
+  const pendingProcurements = procurements.filter(p => p.status === 'Pending');
+  const rejectedProcurements = procurements.filter(p => p.status === 'Rejected');
+  let procurementScore = 20 - (pendingProcurements.length * 4) - (rejectedProcurements.length * 5);
+  procurementScore = Math.max(0, Math.min(20, procurementScore));
+
+  const itemsWithNoVendor = inventory.filter(i => !i.vendor);
+  const vendorsWithMissingInfo = vendors.filter(v => !v.email || !v.contact);
+  let vendorScore = 20 - (itemsWithNoVendor.length * 5) - (vendorsWithMissingInfo.length * 3);
+  vendorScore = Math.max(0, Math.min(20, vendorScore));
+
+  const healthyItems = inventory.filter(i => i.status === 'In Stock' || i.stock > 10);
+  const stockScore = inventory.length > 0
+    ? Math.round((healthyItems.length / inventory.length) * 20)
+    : 20;
+
+  const marketingScore = activeMarketing > 0 ? 10 : 0;
+
+  const totalScore = inventoryScore + procurementScore + vendorScore + stockScore + marketingScore;
+  
+  return {
+    score: totalScore,
+    breakdown: {
+      inventoryScore,
+      procurementScore,
+      vendorScore,
+      stockScore,
+      marketingScore
+    }
+  };
+}
+
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
@@ -144,6 +181,38 @@ export const AppProvider = ({ children }) => {
       unsubNotifications();
     };
   }, [currentUser]);
+
+  // Recalculate AI Health Scan results locally in real-time on inventory/procurement updates
+  useEffect(() => {
+    if (!currentUser || inventory.length === 0) return;
+
+    const metrics = calculateHealthScore(inventory, procurementRequests, vendorsList, activeMarketing);
+    const lowStockCount = inventory.filter(i => i.stock <= 10).length;
+
+    setLastScanResults(prev => {
+      if (!prev) {
+        return null;
+      }
+
+      const freshCriticalActions = prev.criticalActions
+        ? prev.criticalActions.filter(action => {
+            const matchingItem = inventory.find(inv => action.description.toLowerCase().includes(inv.name.toLowerCase()));
+            if (matchingItem && matchingItem.stock > 10) {
+              return false; // Exclude because it is no longer low stock
+            }
+            return true;
+          })
+        : [];
+
+      return {
+        ...prev,
+        score: metrics.score,
+        breakdown: metrics.breakdown,
+        lowStockCount: lowStockCount,
+        criticalActions: freshCriticalActions
+      };
+    });
+  }, [inventory, procurementRequests, vendorsList, activeMarketing, currentUser]);
 
   // Inventory CRUD triggers mapping to services
   const addInventoryItem = async (itemData) => {
@@ -498,10 +567,8 @@ export const AppProvider = ({ children }) => {
         : 20;
 
       // Category 5: Marketing Activity (Max 10 points)
-      // Award 5 points if marketing campaigns exist, 5 more if more than 1 exists.
-      let marketingScore = 0;
-      if (dbMarketing.length > 0) marketingScore += 5;
-      if (dbMarketing.length > 1) marketingScore += 5;
+      // Award 10 points if active marketing workspace campaign is active, otherwise 0 points.
+      const marketingScore = activeMarketing > 0 ? 10 : 0;
 
       const totalScore = inventoryScore + procurementScore + vendorScore + stockScore + marketingScore;
 

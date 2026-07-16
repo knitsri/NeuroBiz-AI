@@ -91,6 +91,15 @@ export async function addInventoryItem(ownerUid, itemData) {
       createdAt: new Date().toISOString()
     };
 
+    const stockNum = Number(item.stock || 0);
+    if (stockNum === 0) {
+      item.status = 'Out of Stock';
+    } else if (stockNum <= 10) {
+      item.status = 'Low Stock';
+    } else {
+      item.status = 'In Stock';
+    }
+
     // If new item specifies a vendor, check if it exists in vendors collection. If not, create it.
     if (item.vendor) {
       const newVendorQ = query(
@@ -127,62 +136,63 @@ export async function updateInventoryItem(ownerUid, itemId, itemData) {
     if (itemData.name) updateData.itemName = itemData.name;
     if (itemData.itemName) updateData.name = itemData.itemName;
 
+    const invSnap = await getDocs(query(collection(db, 'inventory'), where('ownerUid', '==', ownerUid)));
+    const items = [];
+    invSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+    const itemToUpdate = items.find(i => i.id === itemId);
+
+    if (!itemToUpdate) {
+      throw new Error("Unauthorized: Inventory item does not belong to this owner.");
+    }
+
     if (itemData.vendor !== undefined) {
-      // Fetch current inventory to compare old and new vendor names
-      const invSnap = await getDocs(query(collection(db, 'inventory'), where('ownerUid', '==', ownerUid)));
-      const items = [];
-      invSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
-      const itemToUpdate = items.find(i => i.id === itemId);
+      const oldVendor = itemToUpdate.vendor;
+      const newVendor = itemData.vendor;
 
-      if (itemToUpdate) {
-        const oldVendor = itemToUpdate.vendor;
-        const newVendor = itemData.vendor;
+      if (oldVendor !== newVendor) {
+        // If new vendor is not empty/null, check if it exists in vendors collection. If not, create it.
+        if (newVendor) {
+          const newVendorQ = query(
+            collection(db, 'vendors'),
+            where('ownerUid', '==', ownerUid),
+            where('name', '==', newVendor)
+          );
+          const newVendorSnap = await getDocs(newVendorQ);
+          if (newVendorSnap.empty) {
+            await addDoc(collection(db, 'vendors'), {
+              name: newVendor,
+              ownerUid,
+              createdAt: new Date().toISOString()
+            });
+          }
+        }
 
-        if (oldVendor !== newVendor) {
-          // If new vendor is not empty/null, check if it exists in vendors collection. If not, create it.
-          if (newVendor) {
-            const newVendorQ = query(
+        // If old vendor is not empty/null, check if it becomes unused.
+        if (oldVendor) {
+          const otherItemsReferencingOldVendor = items.filter(i => i.id !== itemId && i.vendor === oldVendor);
+          if (otherItemsReferencingOldVendor.length === 0) {
+            const oldVendorQ = query(
               collection(db, 'vendors'),
               where('ownerUid', '==', ownerUid),
-              where('name', '==', newVendor)
+              where('name', '==', oldVendor)
             );
-            const newVendorSnap = await getDocs(newVendorQ);
-            if (newVendorSnap.empty) {
-              await addDoc(collection(db, 'vendors'), {
-                name: newVendor,
-                ownerUid,
-                createdAt: new Date().toISOString()
-              });
-            }
-          }
-
-          // If old vendor is not empty/null, check if it becomes unused.
-          if (oldVendor) {
-            const otherItemsReferencingOldVendor = items.filter(i => i.id !== itemId && i.vendor === oldVendor);
-            if (otherItemsReferencingOldVendor.length === 0) {
-              const oldVendorQ = query(
-                collection(db, 'vendors'),
-                where('ownerUid', '==', ownerUid),
-                where('name', '==', oldVendor)
-              );
-              const oldVendorSnap = await getDocs(oldVendorQ);
-              for (const docD of oldVendorSnap.docs) {
-                await deleteDoc(doc(db, 'vendors', docD.id));
-              }
+            const oldVendorSnap = await getDocs(oldVendorQ);
+            for (const docD of oldVendorSnap.docs) {
+              await deleteDoc(doc(db, 'vendors', docD.id));
             }
           }
         }
-      } else {
-        throw new Error("Unauthorized: Inventory item does not belong to this owner.");
       }
+    }
+
+    const currentStock = updateData.stock !== undefined ? updateData.stock : (itemToUpdate.stock || 0);
+    const stockNum = Number(currentStock);
+    if (stockNum === 0) {
+      updateData.status = 'Out of Stock';
+    } else if (stockNum <= 10) {
+      updateData.status = 'Low Stock';
     } else {
-      const invSnap = await getDocs(query(collection(db, 'inventory'), where('ownerUid', '==', ownerUid)));
-      const items = [];
-      invSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
-      const itemToUpdate = items.find(i => i.id === itemId);
-      if (!itemToUpdate) {
-        throw new Error("Unauthorized: Inventory item does not belong to this owner.");
-      }
+      updateData.status = 'In Stock';
     }
 
     await updateDoc(docRef, updateData);

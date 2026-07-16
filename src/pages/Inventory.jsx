@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  X, 
-  Check, 
+import {
+  Search,
+  Filter,
+  Plus,
+  Edit2,
+  Trash2,
+  X,
+  Check,
   Inbox,
-  AlertTriangle 
+  AlertTriangle
 } from 'lucide-react';
 
 export default function Inventory() {
   const { inventory, addInventoryItem, editInventoryItem, deleteInventoryItem } = useApp();
-  
+
   // Search and Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  
+
   // Modal States
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -82,24 +82,24 @@ export default function Inventory() {
 
   // Filter & Search Logic
   const filteredInventory = inventory.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          item.category.toLowerCase().includes(searchQuery.toLowerCase());
-    
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchQuery.toLowerCase());
+
     const matchesFilter = statusFilter === 'All' || item.status === statusFilter;
-    
+
     return matchesSearch && matchesFilter;
   });
 
   return (
     <div className="pt-20 pl-4 md:pl-72 pr-4 md:pr-8 pb-12 min-h-screen text-slate-100 flex flex-col gap-6">
-      
+
       {/* Top Banner & Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-200">Inventory Ledger</h2>
           <p className="text-xs text-slate-505">Add, edit, track and audit all your warehouse SKU assets.</p>
         </div>
-        
+
         <button
           onClick={() => setIsAddOpen(true)}
           className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all duration-300 shadow-md shadow-indigo-600/10 cursor-pointer self-start sm:self-auto w-full sm:w-auto"
@@ -132,11 +132,10 @@ export default function Inventory() {
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                statusFilter === status 
-                  ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400' 
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${statusFilter === status
+                  ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400'
                   : 'bg-slate-900/40 border-slate-850 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-              }`}
+                }`}
             >
               {status}
             </button>
@@ -163,14 +162,14 @@ export default function Inventory() {
                   <th className="py-4 px-6">Category</th>
                   <th className="py-4 px-6">Current Stock</th>
                   <th className="py-4 px-6">Supplier Vendor</th>
-                  <th className="py-4 px-6">System Status</th>
+                  <th className="py-4 px-6">Stock Status</th>
                   <th className="py-4 px-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-850/60 text-xs font-semibold text-slate-300">
                 {filteredInventory.map((item) => (
-                  <tr 
-                    key={item.id} 
+                  <tr
+                    key={item.id}
                     className="hover:bg-slate-900/30 transition-colors"
                   >
                     <td className="py-4 px-6 font-bold text-slate-200">{item.name}</td>
@@ -182,13 +181,12 @@ export default function Inventory() {
                     <td className="py-4 px-6">{item.stock} Units</td>
                     <td className="py-4 px-6 text-slate-400">{item.vendor}</td>
                     <td className="py-4 px-6">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border ${
-                        item.status === 'In Stock' 
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                          : item.status === 'Low Stock' 
-                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                          : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border ${item.status === 'In Stock'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                          : item.status === 'Low Stock'
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        }`}>
                         {item.status}
                       </span>
                     </td>
@@ -225,14 +223,14 @@ export default function Inventory() {
           <div className="glass rounded-3xl border border-slate-800 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b border-slate-850 flex items-center justify-between">
               <h3 className="font-bold text-sm text-slate-200">Create Inventory Record</h3>
-              <button 
+              <button
                 onClick={() => setIsAddOpen(false)}
                 className="p-1 text-slate-500 hover:text-slate-350 rounded-lg hover:bg-slate-900 cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            
+
             <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Item Name</label>
@@ -301,14 +299,14 @@ export default function Inventory() {
           <div className="glass rounded-3xl border border-slate-800 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b border-slate-850 flex items-center justify-between">
               <h3 className="font-bold text-sm text-slate-200">Edit SKU Record</h3>
-              <button 
+              <button
                 onClick={() => setIsEditOpen(false)}
                 className="p-1 text-slate-500 hover:text-slate-350 rounded-lg hover:bg-slate-900 cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            
+
             <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Item Name</label>

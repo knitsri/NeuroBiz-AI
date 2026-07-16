@@ -167,19 +167,33 @@ export default function VendorDashboard() {
                     className="p-4 rounded-xl bg-slate-900/60 border border-slate-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                   >
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-bold text-slate-200">{req.item}</span>
                         <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-black uppercase text-emerald-400">
                           {req.quantity} Units
                         </span>
+                        {req.paymentStatus === 'Paid' ? (
+                          <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-black uppercase text-emerald-400">
+                            🟢 Paid
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-black uppercase text-yellow-400">
+                            🟡 Pending
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[10px] text-slate-500 mt-1">Requested by: <strong className="text-slate-450">{req.businessName}</strong></p>
+                      <p className="text-[10px] text-slate-505 mt-1">Requested by: <strong className="text-slate-450">{req.businessName}</strong></p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleAction(req.id, req.item, 'complete')}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-md shadow-emerald-600/10"
+                        disabled={req.paymentStatus !== 'Paid'}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 shadow-md ${
+                          req.paymentStatus === 'Paid'
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-emerald-600/10'
+                            : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none'
+                        }`}
                       >
                         <Check className="h-3.5 w-3.5" />
                         <span>Mark as Shipped</span>
