@@ -70,6 +70,18 @@ Additionally, business owners and vendors typically operate on separate systems,
 - Active contract tracking
 - Owner–Vendor collaboration
 
+### 💳 Procurement Payments
+- Razorpay Payment Gateway integration (Test Mode)
+- Seamless payment flow for procurement orders
+- Real-time payment status tracking
+- Invoice generation after successful payment
+
+### 📲 Real-Time WhatsApp Notifications
+- Instant procurement request notifications
+- Order acceptance alerts
+- Shipment status updates
+- Owner–Vendor communication powered by Twilio WhatsApp API
+
 ### 🎨 AI Marketing Studio
 - AI-generated promotional posters
 - Instagram captions
@@ -92,15 +104,19 @@ AI detects low stock
    │
 Approve Procurement
    │
-Vendor receives request
+Vendor receives procurement request
    │
-Vendor Approves
+Vendor also receives an instant WhatsApp notification
    │
-Active Contract
+Vendor approves the request
    │
-Vendor Ships
+Owner receives WhatsApp notification
    │
-Owner receives update
+Owner completes payment via Razorpay
+   │
+Vendor ships the order
+   │
+Owner receives shipment update via WhatsApp
 ```
 
 ## 🛠 Tech Stack
@@ -120,6 +136,12 @@ Owner receives update
 ### AI Services
 - Google Gemini API
 - Cloudflare Workers AI
+
+### Payment Gateway
+- Razorpay
+
+### Communication
+- Twilio WhatsApp API (Real-time procurement notifications)
 
 ### Server
 - Node.js
@@ -147,7 +169,16 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 
 VITE_GEMINI_API_KEY=
+VITE_API_URL=
+VITE_APP_URL=
 
 CLOUDFLARE_ACCOUNT_ID=
 CLOUDFLARE_API_TOKEN=
+
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_NUMBER=
+
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
 ```
