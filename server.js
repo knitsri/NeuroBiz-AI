@@ -2,9 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, doc, updateDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import twilio from 'twilio';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -250,6 +252,150 @@ app.post('/api/send-whatsapp', async (req, res) => {
     return res.status(500).json({
       error: "SEND_ERROR",
       message: error.message || "Failed to send WhatsApp message."
+    });
+  }
+});
+
+app.post('/api/create-order', async (req, res) => {
+  const { procurementId, amount } = req.body;
+
+  if (!procurementId || amount === undefined || amount === null) {
+    return res.status(400).json({ error: "procurementId and amount are required fields." });
+  }
+
+  const numericAmount = Number(amount);
+  if (isNaN(numericAmount) || numericAmount <= 0) {
+    return res.status(400).json({ error: "amount must be a valid positive number." });
+  }
+
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!keyId || !keySecret) {
+    console.error("Razorpay Config Error: Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET in environment.");
+    return res.status(500).json({
+      error: "CONFIGURATION_ERROR",
+      message: "Razorpay credentials are not configured on the server."
+    });
+  }
+
+  try {
+    const rzp = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret
+    });
+
+    const amountInPaise = Math.round(numericAmount * 100);
+
+    const order = await rzp.orders.create({
+      amount: amountInPaise,
+      currency: "INR",
+      receipt: procurementId
+    });
+
+    return res.json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: keyId
+    });
+  } catch (error) {
+    console.error("Razorpay create-order backend error:", error);
+    return res.status(500).json({
+      error: "CREATE_ORDER_ERROR",
+      message: error.message || "Failed to create Razorpay Test Mode order."
+    });
+  }
+});
+
+app.post('/api/verify-payment', async (req, res) => {
+  const { procurementId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  if (!procurementId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ error: "Missing required signature verification fields." });
+  }
+
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!keyId || !keySecret) {
+    console.error("Razorpay Config Error: Missing credentials in environment during verification.");
+    return res.status(500).json({
+      error: "CONFIGURATION_ERROR",
+      message: "Razorpay credentials are not configured on the server."
+    });
+  }
+
+  try {
+    // Generate signature verify string
+    const generated_signature = crypto
+      .createHmac('sha256', keySecret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
+
+    if (generated_signature !== razorpay_signature) {
+      console.error("Razorpay verification failed: Signature mismatch.");
+      return res.status(400).json({ error: "SIGNATURE_MISMATCH", message: "Razorpay signature verification failed." });
+    }
+
+    // Verification succeeded: Update corresponding procurement document in Firestore
+    const requestDocRef = doc(db, 'procurements', procurementId);
+    const requestSnapshot = await getDoc(requestDocRef);
+
+    if (!requestSnapshot.exists()) {
+      console.error(`Firestore Error: Procurement request document with ID ${procurementId} not found.`);
+      return res.status(404).json({ error: "DOCUMENT_NOT_FOUND", message: "Procurement request document not found." });
+    }
+
+    const requestData = requestSnapshot.data();
+
+    // Update status and payment tags in Firestore
+    await updateDoc(requestDocRef, {
+      paymentStatus: "Paid",
+      paymentId: razorpay_payment_id,
+      paymentDate: new Date().toISOString()
+    });
+
+    // Send WhatsApp notification to the Vendor
+    try {
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('role', '==', 'vendor'),
+        where('businessName', '==', requestData.vendor)
+      );
+      const userSnapshot = await getDocs(usersQuery);
+      if (!userSnapshot.empty) {
+        const vendorData = userSnapshot.docs[0].data();
+        if (vendorData.phone) {
+          const waMessage = `💳 Payment received.
+
+Business: ${requestData.businessName}
+Item: ${requestData.item}
+Quantity: ${requestData.quantity}
+
+You may now prepare the shipment.`;
+
+          const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+          const formattedTo = vendorData.phone.startsWith('whatsapp:') ? vendorData.phone : `whatsapp:${vendorData.phone}`;
+          const formattedFrom = process.env.TWILIO_WHATSAPP_NUMBER.startsWith('whatsapp:') ? process.env.TWILIO_WHATSAPP_NUMBER : `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`;
+
+          await client.messages.create({
+            from: formattedFrom,
+            to: formattedTo,
+            body: waMessage
+          });
+        }
+      }
+    } catch (whatsappErr) {
+      console.error("WhatsApp notification dispatch failed after successful payment:", whatsappErr);
+    }
+
+    return res.json({ success: true, message: "Payment verified and document updated successfully." });
+  } catch (error) {
+    console.error("Razorpay verification backend error:", error);
+    return res.status(500).json({
+      error: "VERIFY_PAYMENT_ERROR",
+      message: error.message || "An error occurred during Razorpay payment verification."
     });
   }
 });

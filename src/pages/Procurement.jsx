@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   ShoppingCart,
@@ -15,15 +15,46 @@ import {
   RefreshCw,
   Mail,
   Award,
-  ShieldCheck
+  ShieldCheck,
+  CreditCard
 } from 'lucide-react';
+import { generateInvoicePDF } from '../services/invoice';
+
+export function getProductPrice(name) {
+  const clean = (name || '').toLowerCase().trim();
+  if (clean.includes('rice')) return 85;
+  if (clean.includes('garlic')) return 60;
+  if (clean.includes('tomato')) return 40;
+  if (clean.includes('onion')) return 35;
+  if (clean.includes('chicken')) return 220;
+  if (clean.includes('flour')) return 45;
+  if (clean.includes('oil')) return 160;
+  if (clean.includes('milk')) return 50;
+
+  if (clean.includes('paracetamol')) return 15;
+  if (clean.includes('amoxicillin')) return 95;
+  if (clean.includes('aspirin')) return 25;
+  if (clean.includes('cough syrup')) return 75;
+
+  if (clean.includes('t-shirt') || clean.includes('tshirt')) return 299;
+  if (clean.includes('jean')) return 799;
+  if (clean.includes('jacket')) return 1499;
+  if (clean.includes('shirt')) return 499;
+  if (clean.includes('sock')) return 99;
+
+  // Default fallback price
+  return 120;
+}
 
 export default function Procurement() {
-  const { businessType, procurementRequests, approveRecommendation, vendorsList, inventory, addSupplier } = useApp();
+  const [recommendations, setRecommendations] = useState([]);
+  console.log("PROCUREMENT COMPONENT RENDERED, recommendations.length:", recommendations.length);
+  const { currentUser, businessType, procurementRequests, approveRecommendation, vendorsList, inventory, addSupplier } = useApp();
   const [successMessage, setSuccessMessage] = useState('');
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [orderQuantities, setOrderQuantities] = useState({});
   const [orderLoading, setOrderLoading] = useState({});
+  const [payingOrderId, setPayingOrderId] = useState(null);
 
   // Modal registration states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -33,18 +64,65 @@ export default function Procurement() {
   const [supPhone, setSupPhone] = useState('');
   const [supProducts, setSupProducts] = useState('');
 
-  const recommendations = inventory
-    .filter(item => item.stock <= item.minimumStock)
-    .map(item => ({
-      id: `rec-${item.id}`,
-      name: item.name,
-      currentStock: item.stock,
-      recommendedStock: Math.max(25, (item.minimumStock * 4) - item.stock),
-      vendor: item.vendor || 'A-1 Logistics'
-    }))
-    .filter(rec =>
-      !procurementRequests.some(r => r.item === rec.name && (r.status === 'Pending' || r.status === 'Accepted' || r.status === 'Fulfilled & Shipped'))
-    );
+
+
+  useEffect(() => {
+    console.log("DEBUG: Complete inventory array:", inventory);
+    console.log("DEBUG: Complete procurementRequests array:", procurementRequests);
+
+    // Before filtering, print each inventory item
+    inventory.forEach(item => {
+      console.log("DEBUG: Before filter:", item.name, item.stock);
+    });
+
+    // 1. Low stock filter
+    const lowStockItems = inventory.filter(item => {
+      return item.stock <= 10;
+    });
+    console.log("DEBUG: After low-stock filter:", lowStockItems);
+
+    // 2. Map items to recommendation objects
+    const mappedRecommendations = lowStockItems.map(item => {
+      const qty = Math.max(25, (item.minimumStock * 4) - item.stock);
+      const price = getProductPrice(item.name);
+      return {
+        id: `rec-${item.id}`,
+        name: item.name,
+        currentStock: item.stock,
+        recommendedStock: qty,
+        vendor: item.vendor || 'A-1 Logistics',
+        price: price,
+        totalAmount: price * qty
+      };
+    });
+
+    // 3. Pending/Accepted filter
+    mappedRecommendations.forEach(rec => {
+      console.log("DEBUG: Before Pending/Accepted filter:", rec.name);
+    });
+
+    const finalRecs = mappedRecommendations.filter(rec => {
+      console.log("DEBUG: Inside Pending/Accepted filter:", {
+        recommendationItem: rec.name,
+        procurementItems: procurementRequests.map(r => ({
+          item: r.item,
+          status: r.status
+        }))
+      });
+
+      const hasPendingOrAccepted = procurementRequests.some(r => r.item === rec.name && (r.status === 'Pending' || r.status === 'Accepted'));
+      return !hasPendingOrAccepted;
+    });
+
+    console.log("DEBUG: Final recommendations array before setRecommendations:", finalRecs);
+    console.log("SETTING RECOMMENDATIONS", finalRecs);
+    setRecommendations(finalRecs);
+    console.log("SET RECOMMENDATIONS CALLED");
+  }, [inventory, procurementRequests]);
+
+  useEffect(() => {
+    console.log("recommendations state changed:", recommendations);
+  }, [recommendations]);
 
   // Filter vendors list to remove duplicate entries by name
   const uniqueVendors = [];
@@ -130,10 +208,13 @@ export default function Procurement() {
 
     setOrderLoading(prev => ({ ...prev, [product.name]: true }));
     try {
+      const price = getProductPrice(product.name);
       const success = await approveRecommendation({
         name: product.name,
         recommendedStock: qty,
-        vendor: vendorName
+        vendor: vendorName,
+        price: price,
+        totalAmount: price * qty
       });
 
       if (success) {
@@ -149,6 +230,106 @@ export default function Procurement() {
       setTimeout(() => setSuccessMessage(''), 4050);
     } finally {
       setOrderLoading(prev => ({ ...prev, [product.name]: false }));
+    }
+  };
+
+  const handlePayment = async (req) => {
+    if (payingOrderId) return;
+    setPayingOrderId(req.id);
+
+    try {
+      const amount = req.totalAmount || ((req.price || 120) * req.quantity);
+
+      const createResponse = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          procurementId: req.id,
+          amount: amount
+        })
+      });
+
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text();
+        console.error("Backend order creation error:", errorText);
+        throw new Error(errorText || "Failed to create payment order.");
+      }
+
+      const orderData = await createResponse.json();
+      const { orderId, amount: rzpAmount, currency, keyId } = orderData;
+
+      const options = {
+        key: keyId,
+        amount: rzpAmount,
+        currency: currency,
+        name: "NeuroBiz AI",
+        description: `Procurement Payment for ${req.item}`,
+        order_id: orderId,
+        handler: async function (response) {
+          try {
+            const verifyResponse = await fetch('/api/verify-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                procurementId: req.id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+
+            if (!verifyResponse.ok) {
+              const verifyError = await verifyResponse.text();
+              console.error("Backend signature verification error:", verifyError);
+              throw new Error(verifyError || "Payment signature verification failed.");
+            }
+
+            window.dispatchEvent(new CustomEvent('neurobiz-toast', {
+              detail: { message: "💳 Payment verified and completed successfully!", type: "success" }
+            }));
+
+            setPayingOrderId(null);
+          } catch (err) {
+            console.error("Verification backend/client error:", err);
+            window.dispatchEvent(new CustomEvent('neurobiz-toast', {
+              detail: { message: "❌ Payment verification failed. Please check with your bank.", type: "error" }
+            }));
+            setPayingOrderId(null);
+          }
+        },
+        prefill: {
+          name: currentUser?.name || "",
+          email: currentUser?.email || ""
+        },
+        theme: {
+          color: "#6366f1"
+        },
+        modal: {
+          ondismiss: function () {
+            setPayingOrderId(null);
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (response) {
+        console.error("Razorpay test payment failed:", response.error);
+        window.dispatchEvent(new CustomEvent('neurobiz-toast', {
+          detail: { message: "❌ Payment failed. Please try again.", type: "error" }
+        }));
+        setPayingOrderId(null);
+      });
+      rzp.open();
+    } catch (err) {
+      console.error("Razorpay workflow startup error:", err);
+      window.dispatchEvent(new CustomEvent('neurobiz-toast', {
+        detail: { message: "❌ Payment failed. Please try again.", type: "error" }
+      }));
+      setPayingOrderId(null);
     }
   };
 
@@ -296,17 +477,25 @@ export default function Procurement() {
                       const hasPending = procurementRequests.some(r => r.item === product.name && r.status === 'Pending');
                       const currentQty = orderQuantities[product.name] ?? 25;
                       const isLoading = orderLoading[product.name] ?? false;
+                      const price = getProductPrice(product.name);
+                      const totalPrice = price * currentQty;
 
                       return (
                         <div key={product.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 first:pt-0 last:pb-0">
                           <div>
                             <span className="text-xs font-bold text-slate-200">{product.name}</span>
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
                               <span className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-[9px] text-slate-400">
                                 {product.category}
                               </span>
                               <span className="text-[10px] text-slate-500">
                                 Stock: <strong className={product.stock <= product.minimumStock ? 'text-rose-400' : 'text-slate-300'}>{product.stock} units</strong>
+                              </span>
+                              <span className="px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[9px] text-indigo-405 font-bold">
+                                Rs. {price} / unit
+                              </span>
+                              <span className="text-[10px] text-emerald-400 font-extrabold uppercase">
+                                Total: Rs. {totalPrice}
                               </span>
                             </div>
                           </div>
@@ -397,6 +586,17 @@ export default function Procurement() {
                       <span className="text-indigo-400">+{rec.recommendedStock} Units</span>
                     </div>
                   </div>
+
+                  <div className="mt-3 flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-850 text-xs font-bold text-slate-500">
+                    <div>
+                      <p className="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Unit Price</p>
+                      <span className="text-indigo-400">Rs. {rec.price}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Total Amount</p>
+                      <span className="text-emerald-400 font-extrabold uppercase">Rs. {rec.totalAmount}</span>
+                    </div>
+                  </div>
                 </div>
 
                 <button
@@ -440,32 +640,72 @@ export default function Procurement() {
                     <th className="py-4 px-6">Target Supplier</th>
                     <th className="py-4 px-6">Submission Date</th>
                     <th className="py-4 px-6">Deal Status</th>
+                    <th className="py-4 px-6">Payment Status</th>
+                    <th className="py-4 px-6 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-850/60 text-xs font-semibold text-slate-350">
                   {pastOwnerRequests.map((req) => (
                     <tr key={req.id} className="hover:bg-slate-900/30 transition-colors">
-                      <td className="py-4 px-6 font-mono text-[10px] text-slate-500">{req.id.toUpperCase()}</td>
+                      <td className="py-4 px-6 font-mono text-[10px] text-slate-505">{req.id.toUpperCase()}</td>
                       <td className="py-4 px-6 font-bold text-slate-200">{req.item}</td>
                       <td className="py-4 px-6">{req.quantity} Units</td>
                       <td className="py-4 px-6 text-slate-400">{req.vendor}</td>
                       <td className="py-4 px-6 text-slate-500">{req.date}</td>
                       <td className="py-4 px-6">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border flex items-center gap-1 w-fit ${req.status === 'Approved' || req.status === 'Accepted' || req.status === 'Fulfilled & Shipped'
+                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border flex items-center gap-1 w-fit ${req.status === 'Accepted' || req.status === 'Fulfilled & Shipped'
                           ? 'bg-emerald-500/10 text-emerald-450 border-emerald-500/20'
                           : req.status === 'Rejected'
                             ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
                             : 'bg-yellow-500/10 text-yellow-455 border-yellow-500/20'
                           }`}>
-                          {(req.status === 'Approved' || req.status === 'Accepted' || req.status === 'Fulfilled & Shipped') && <CheckCircle2 className="h-3 w-3" />}
+                          {(req.status === 'Accepted' || req.status === 'Fulfilled & Shipped') && <CheckCircle2 className="h-3 w-3" />}
                           {req.status === 'Rejected' && <XCircle className="h-3 w-3" />}
                           {req.status === 'Pending' && <Clock className="h-3 w-3 animate-pulse" />}
-                          <span>
-                            {req.status === 'Accepted' ? 'Accepted' :
-                              req.status === 'Approved' || req.status === 'Fulfilled & Shipped' ? 'Fulfilled & Shipped' :
-                                req.status}
-                          </span>
+                          <span>{req.status}</span>
                         </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        {req.status === 'Pending' || req.status === 'Rejected' ? (
+                          <span className="text-slate-600">—</span>
+                        ) : req.paymentStatus === 'Paid' ? (
+                          <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase text-emerald-400">
+                            🟢 Paid
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-[9px] font-black uppercase text-yellow-400">
+                            🟡 Pending
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        {req.status === 'Pending' ? (
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                            Waiting for Vendor
+                          </span>
+                        ) : req.status === 'Accepted' && req.paymentStatus !== 'Paid' ? (
+                          <button
+                            onClick={() => handlePayment(req)}
+                            disabled={payingOrderId === req.id}
+                            className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-[10px] font-extrabold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ml-auto shadow-md shadow-indigo-600/10"
+                          >
+                            <CreditCard className="h-3.5 w-3.5" />
+                            <span>{payingOrderId === req.id ? 'Processing...' : 'Pay Now'}</span>
+                          </button>
+                        ) : req.status === 'Accepted' && req.paymentStatus === 'Paid' ? (
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                            Waiting for Shipment
+                          </span>
+                        ) : req.status === 'Fulfilled & Shipped' && req.paymentStatus === 'Paid' ? (
+                          <button
+                            onClick={() => generateInvoicePDF(req)}
+                            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-extrabold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1 cursor-pointer ml-auto shadow-md shadow-emerald-600/10"
+                          >
+                            <span>Download Invoice</span>
+                          </button>
+                        ) : (
+                          <span className="text-slate-600">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
